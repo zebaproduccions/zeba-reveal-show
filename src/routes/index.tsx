@@ -1,26 +1,78 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import logoZeba from "@/assets/logo-zeba.png";
+import logoZebby from "@/assets/logo-zebby.png";
+import logoZuite from "@/assets/logo-zuite.png";
+import logoMcp from "@/assets/logo-mcp.png";
 
 export const Route = createFileRoute("/")({
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
+const subtitle = "Les nostres aplicacions";
+
+const apps = [
+  { src: logoZebby, alt: "zebby" },
+  { src: logoZuite, alt: "zuite" },
+  { src: logoMcp, alt: "mcp" },
+];
 
 function Index() {
-  return <PlaceholderIndex />;
+  return (
+    <main className="min-h-screen w-full bg-white flex items-center justify-center px-6 py-16">
+      <div className="flex flex-col items-center gap-14 md:gap-20 max-w-5xl w-full">
+        <motion.img
+          src={logoZeba}
+          alt="zeba"
+          initial={{ opacity: 0, scale: 0.93, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+          className="w-[260px] md:w-[420px] h-auto select-none"
+          draggable={false}
+        />
+
+        <h1
+          aria-label={subtitle}
+          className="text-2xl md:text-4xl font-light tracking-tight text-neutral-900 text-center overflow-hidden"
+        >
+          <span className="inline-flex flex-wrap justify-center">
+            {subtitle.split("").map((char, i) => (
+              <motion.span
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  delay: 1 + i * 0.04,
+                  duration: 0.35,
+                  ease: "easeOut",
+                }}
+                className="inline-block whitespace-pre"
+              >
+                {char}
+              </motion.span>
+            ))}
+          </span>
+        </h1>
+
+        <div className="flex items-center justify-center gap-10 md:gap-20 flex-wrap">
+          {apps.map((app, i) => (
+            <motion.img
+              key={app.alt}
+              src={app.src}
+              alt={app.alt}
+              initial={{ opacity: 0, y: 16, scale: 0.95, filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+              transition={{
+                delay: 2 + i * 0.3,
+                duration: 0.8,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="w-24 md:w-36 h-auto object-contain select-none drop-shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
+              draggable={false}
+            />
+          ))}
+        </div>
+      </div>
+    </main>
+  );
 }
