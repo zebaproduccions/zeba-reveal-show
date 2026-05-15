@@ -120,6 +120,133 @@ function drawFrame(
 
 export type RecordFormat = "webm" | "mp4";
 
+type VideoFrameLike = { close: () => void };
+type VideoFrameConstructorLike = new (
+  source: HTMLCanvasElement,
+  init: { timestamp: number; duration?: number },
+) => VideoFrameLike;
+type VideoEncoderLike = {
+  configure: (config: Record<string, unknown>) => void;
+  encode: (frame: VideoFrameLike, options?: { keyFrame?: boolean }) => void;
+  flush: () => Promise<void>;
+  close: () => void;
+};
+type VideoEncoderConstructorLike = {
+  new (init: {
+    output: (chunk: unknown, meta?: unknown) => void;
+    error: (error: unknown) => void;
+  }): VideoEncoderLike;
+  isConfigSupported?: (
+    config: Record<string, unknown>,
+  ) => Promise<{ supported: boolean; config?: Record<string, unknown> }>;
+};
+
+function downloadBlob(blob: Blob, extension: RecordFormat) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `zeba-aplicacions.${extension}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function getSupportedMp4Config(
+  VideoEncoderCtor: VideoEncoderConstructorLike,
+  W: number,
+  H: number,
+  FPS: number,
+) {
+  const baseConfig = {
+    width: W,
+    height: H,
+    bitrate: 40_000_000,
+    framerate: FPS,
+    latencyMode: "quality",
+    avc: { format: "avc" },
+  };
+  const configs = [
+    { ...baseConfig, codec: "avc1.640034" },
+    { ...baseConfig, codec: "avc1.640033" },
+    { ...baseConfig, codec: "avc1.4D4034" },
+    { ...baseConfig, codec: "avc1.420034" },
+    { ...baseConfig, codec: "avc1.42E034" },
+  ];
+
+  if (!VideoEncoderCtor.isConfigSupported) return configs[0];
+
+  for (const config of configs) {
+    const support = await VideoEncoderCtor.isConfigSupported(config);
+    if (support.supported) return support.config ?? config;
+  }
+
+  throw new Error("Aquest navegador no pot codificar MP4/H.264 a aquesta resolució.");
+}
+
+async function recordMp4WithWebCodecs(
+  ctx: CanvasRenderingContext2D,
+  imgs: { zeba: HTMLImageElement; apps: HTMLImageElement[] },
+  W: number,
+  H: number,
+  onProgress?: (p: number) => void,
+) {
+  const globals = globalThis as typeof globalThis & {
+    VideoEncoder?: VideoEncoderConstructorLike;
+    VideoFrame?: VideoFrameConstructorLike;
+  };
+  const VideoEncoderCtor = globals.VideoEncoder;
+  const VideoFrameCtor = globals.VideoFrame;
+
+  if (!VideoEncoderCtor || !VideoFrameCtor) {
+    throw new Error("Aquest navegador no suporta exportació MP4 estable. Prova Chrome o Edge actualitzat.");
+  }
+
+  const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
+  const FPS = 30;
+  const totalFrames = Math.round((DURATION / 1000) * FPS);
+  const frameDurationUs = Math.round(1_000_000 / FPS);
+  const totalDurationUs = DURATION * 1000;
+  const target = new ArrayBufferTarget();
+  const muxer = new Muxer({
+    target,
+    video: { codec: "avc", width: W, height: H, frameRate: FPS },
+    fastStart: { expectedVideoChunks: totalFrames },
+  });
+  const muxerWriter = muxer as unknown as {
+    addVideoChunk: (chunk: unknown, meta?: unknown) => void;
+    finalize: () => void;
+  };
+  let encoderError: unknown = null;
+  const encoder = new VideoEncoderCtor({
+    output: (chunk, meta) => muxerWriter.addVideoChunk(chunk, meta),
+    error: (error) => {
+      encoderError = error;
+    },
+  });
+
+  encoder.configure(await getSupportedMp4Config(VideoEncoderCtor, W, H, FPS));
+
+  for (let f = 0; f < totalFrames; f++) {
+    const timestamp = f * frameDurationUs;
+    const duration = f === totalFrames - 1 ? totalDurationUs - timestamp : frameDurationUs;
+    drawFrame(ctx, (f / FPS) * 1000, imgs, W, H);
+    const frame = new VideoFrameCtor(ctx.canvas, { timestamp, duration });
+    encoder.encode(frame, { keyFrame: f % FPS === 0 });
+    frame.close();
+    onProgress?.(Math.min(0.95, (f + 1) / totalFrames));
+    await new Promise((r) => setTimeout(r, 0));
+    if (encoderError) throw encoderError;
+  }
+
+  await encoder.flush();
+  if (encoderError) throw encoderError;
+  encoder.close();
+  muxerWriter.finalize();
+  onProgress?.(1);
+  downloadBlob(new Blob([target.buffer], { type: "video/mp4" }), "mp4");
+}
+
 export async function recordAnimation(
   onProgress?: (p: number) => void,
   format: RecordFormat = "webm",
@@ -138,6 +265,11 @@ export async function recordAnimation(
     loadImage(logoMcp),
   ]);
   const imgs = { zeba, apps: [zebby, zuite, mcp] };
+
+  if (format === "mp4") {
+    await recordMp4WithWebCodecs(ctx, imgs, W, H, onProgress);
+    return;
+  }
 
   // Determine supported mime based on requested format
   const mp4Candidates = [
