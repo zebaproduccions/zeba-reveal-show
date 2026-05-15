@@ -20,20 +20,20 @@ const apps = [
 ];
 
 function Index() {
-  const [recording, setRecording] = useState(false);
+  const [recording, setRecording] = useState<null | "webm" | "mp4">(null);
   const [progress, setProgress] = useState(0);
   const [replayKey, setReplayKey] = useState(0);
 
-  const handleDownload = async () => {
+  const handleDownload = async (format: "webm" | "mp4") => {
     if (recording) return;
-    setRecording(true);
+    setRecording(format);
     setProgress(0);
     try {
-      await recordAnimation((p) => setProgress(p));
+      await recordAnimation((p) => setProgress(p), format);
     } catch (err) {
       console.error(err);
     } finally {
-      setRecording(false);
+      setRecording(null);
       setProgress(0);
     }
   };
