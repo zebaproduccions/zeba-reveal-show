@@ -49,14 +49,15 @@ function Index() {
           alt="zeba"
           initial={{ opacity: 0, scale: 0.93, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ delay: 1, duration: 1, ease: [0.22, 1, 0.36, 1] }}
           className="w-[260px] md:w-[420px] h-auto select-none"
           draggable={false}
         />
 
         <h1
           aria-label={subtitle}
-          className="text-2xl md:text-4xl font-light tracking-tight text-neutral-900 text-center overflow-hidden"
+          className="text-2xl md:text-4xl font-normal tracking-tight text-neutral-900 text-center overflow-hidden"
+          style={{ fontFamily: '"Gentona", "Mulish", "Inter", system-ui, sans-serif' }}
         >
           <span className="inline-flex flex-wrap justify-center">
             {subtitle.split("").map((char, i) => (
@@ -65,7 +66,7 @@ function Index() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{
-                  delay: 1 + i * 0.04,
+                  delay: 2 + i * 0.04,
                   duration: 0.35,
                   ease: "easeOut",
                 }}
@@ -86,7 +87,7 @@ function Index() {
               initial={{ opacity: 0, y: 16, scale: 0.95, filter: "blur(6px)" }}
               animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
               transition={{
-                delay: 2 + i * 0.3,
+                delay: 3 + i * 0.3,
                 duration: 0.8,
                 ease: [0.22, 1, 0.36, 1],
               }}
