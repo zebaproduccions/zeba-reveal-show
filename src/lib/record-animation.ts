@@ -166,7 +166,7 @@ export async function recordAnimation(
   const stream = canvas.captureStream(60);
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: 8_000_000,
+    videoBitsPerSecond: 40_000_000,
   });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => {
