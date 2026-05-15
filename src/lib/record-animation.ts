@@ -163,7 +163,12 @@ export async function recordAnimation(
     );
   }
 
-  const stream = canvas.captureStream(60);
+  // captureStream(0) → no automatic capture; we trigger requestFrame() manually
+  // per garantir que cap frame es perdi encara que el render sigui més lent que real-time.
+  const FPS = 30;
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
+
   const recorder = new MediaRecorder(stream, {
     mimeType,
     videoBitsPerSecond: 40_000_000,
@@ -177,26 +182,22 @@ export async function recordAnimation(
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
-  recorder.start();
+  // timeslice 100ms → flush periòdic perquè el muxer MP4 no truncai el fitxer
+  recorder.start(100);
 
-  // Render an initial frame (white)
-  drawFrame(ctx, 0, imgs, W, H);
+  // Render frame-by-frame en temps virtual (no real-time) per no perdre cap frame
+  const totalFrames = Math.round((DURATION / 1000) * FPS);
+  for (let f = 0; f <= totalFrames; f++) {
+    const t = (f / FPS) * 1000;
+    drawFrame(ctx, t, imgs, W, H);
+    track.requestFrame();
+    onProgress?.(Math.min(1, t / DURATION));
+    // cedeix al main thread perquè el recorder pugui processar el frame
+    await new Promise((r) => setTimeout(r, 1000 / FPS));
+  }
 
-  const startTs = performance.now();
-  await new Promise<void>((resolve) => {
-    function tick() {
-      const t = performance.now() - startTs;
-      drawFrame(ctx, t, imgs, W, H);
-      onProgress?.(Math.min(1, t / DURATION));
-      if (t < DURATION) {
-        requestAnimationFrame(tick);
-      } else {
-        // hold last frame briefly
-        setTimeout(resolve, 400);
-      }
-    }
-    requestAnimationFrame(tick);
-  });
+  // hold last frame perquè el muxer tanqui correctament
+  await new Promise((r) => setTimeout(r, 500));
 
   recorder.stop();
   const blob = await done;
