@@ -117,8 +117,11 @@ function drawFrame(
   });
 }
 
+export type RecordFormat = "webm" | "mp4";
+
 export async function recordAnimation(
   onProgress?: (p: number) => void,
+  format: RecordFormat = "webm",
 ): Promise<void> {
   const W = 1920;
   const H = 1080;
