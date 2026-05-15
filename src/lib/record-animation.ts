@@ -4,7 +4,8 @@ import logoZuite from "@/assets/logo-zuite.png";
 import logoMcp from "@/assets/logo-mcp.png";
 
 const SUBTITLE = "Les nostres aplicacions";
-const DURATION = 5000; // ms
+const START_DELAY = 1000; // ms — pantalla en blanc inicial
+const DURATION = 6000; // ms (5000 + 1000 delay)
 
 function easeOutExpo(t: number) {
   return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
@@ -31,6 +32,9 @@ function drawFrame(
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
+  // Offset everything by START_DELAY for blank intro
+  t = t - START_DELAY;
+
   // ===== Zeba main logo: 0 - 1000ms =====
   const zebaP = Math.max(0, Math.min(1, t / 1000));
   const zebaE = easeOutExpo(zebaP);
@@ -53,7 +57,7 @@ function drawFrame(
   // ===== Subtitle: starts 1000ms, char by char =====
   const charDelay = 40;
   const charDur = 350;
-  ctx.font = `300 44px "Inter", "Helvetica Neue", Arial, sans-serif`;
+  ctx.font = `400 44px "Gentona", "Mulish", "Inter", "Helvetica Neue", Arial, sans-serif`;
   ctx.fillStyle = "#0a0a0a";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
