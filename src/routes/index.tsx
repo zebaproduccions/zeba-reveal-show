@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
+import { useState } from "react";
 import logoZeba from "@/assets/logo-zeba.png";
 import logoZebby from "@/assets/logo-zebby.png";
 import logoZuite from "@/assets/logo-zuite.png";
 import logoMcp from "@/assets/logo-mcp.png";
+import { recordAnimation } from "@/lib/record-animation";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -18,9 +20,30 @@ const apps = [
 ];
 
 function Index() {
+  const [recording, setRecording] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [replayKey, setReplayKey] = useState(0);
+
+  const handleDownload = async () => {
+    if (recording) return;
+    setRecording(true);
+    setProgress(0);
+    try {
+      await recordAnimation((p) => setProgress(p));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRecording(false);
+      setProgress(0);
+    }
+  };
+
   return (
-    <main className="min-h-screen w-full bg-white flex items-center justify-center px-6 py-16">
-      <div className="flex flex-col items-center gap-14 md:gap-20 max-w-5xl w-full">
+    <main className="relative min-h-screen w-full bg-white flex items-center justify-center px-6 py-16">
+      <div
+        key={replayKey}
+        className="flex flex-col items-center gap-14 md:gap-20 max-w-5xl w-full"
+      >
         <motion.img
           src={logoZeba}
           alt="zeba"
@@ -72,6 +95,26 @@ function Index() {
             />
           ))}
         </div>
+      </div>
+
+      {/* Controls */}
+      <div className="fixed bottom-6 right-6 flex items-center gap-3">
+        <button
+          onClick={() => setReplayKey((k) => k + 1)}
+          disabled={recording}
+          className="text-sm px-4 py-2 rounded-full border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition disabled:opacity-50"
+        >
+          Repetir
+        </button>
+        <button
+          onClick={handleDownload}
+          disabled={recording}
+          className="text-sm px-5 py-2 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 transition disabled:opacity-60"
+        >
+          {recording
+            ? `Gravant… ${Math.round(progress * 100)}%`
+            : "Descarregar animació (.webm)"}
+        </button>
       </div>
     </main>
   );
