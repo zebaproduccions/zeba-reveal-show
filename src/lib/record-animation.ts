@@ -57,7 +57,7 @@ function drawFrame(
   // ===== Subtitle: starts 1000ms, char by char =====
   const charDelay = 40;
   const charDur = 350;
-  ctx.font = `400 44px "Gentona", "Inter", "Helvetica Neue", Arial, sans-serif`;
+  ctx.font = `400 44px "Gentona", "Mulish", "Inter", "Helvetica Neue", Arial, sans-serif`;
   ctx.fillStyle = "#0a0a0a";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
