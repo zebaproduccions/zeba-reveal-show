@@ -102,19 +102,28 @@ function Index() {
       <div className="fixed bottom-6 right-6 flex items-center gap-3">
         <button
           onClick={() => setReplayKey((k) => k + 1)}
-          disabled={recording}
+          disabled={recording !== null}
           className="text-sm px-4 py-2 rounded-full border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition disabled:opacity-50"
         >
           Repetir
         </button>
         <button
-          onClick={handleDownload}
-          disabled={recording}
+          onClick={() => handleDownload("webm")}
+          disabled={recording !== null}
+          className="text-sm px-5 py-2 rounded-full border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition disabled:opacity-60"
+        >
+          {recording === "webm"
+            ? `Gravant… ${Math.round(progress * 100)}%`
+            : "Descarregar .webm"}
+        </button>
+        <button
+          onClick={() => handleDownload("mp4")}
+          disabled={recording !== null}
           className="text-sm px-5 py-2 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 transition disabled:opacity-60"
         >
-          {recording
+          {recording === "mp4"
             ? `Gravant… ${Math.round(progress * 100)}%`
-            : "Descarregar animació (.webm)"}
+            : "Descarregar .mp4"}
         </button>
       </div>
     </main>
