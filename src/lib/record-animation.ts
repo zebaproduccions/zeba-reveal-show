@@ -269,29 +269,16 @@ export async function recordAnimation(
     return;
   }
 
-  // Determine supported mime based on requested format
-  const mp4Candidates = [
-    "video/mp4;codecs=avc1.42E01E",
-    "video/mp4;codecs=h264",
-    "video/mp4",
-  ];
+  // WebM fallback/export path. MP4 is handled above with WebCodecs + a real MP4 muxer.
   const webmCandidates = [
     "video/webm;codecs=vp9",
     "video/webm;codecs=vp8",
     "video/webm",
   ];
-  const candidates = format === "mp4" ? mp4Candidates : webmCandidates;
   const mimeType =
-    candidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
+    webmCandidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
     webmCandidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
     "video/webm";
-  const actualFormat = mimeType.startsWith("video/mp4") ? "mp4" : "webm";
-
-  if (format === "mp4" && actualFormat !== "mp4") {
-    console.warn(
-      "MP4 no és suportat per aquest navegador, gravant en WebM. Prova Chrome/Edge recents o Safari.",
-    );
-  }
 
   // captureStream(0) → no automatic capture; we trigger requestFrame() manually
   // per garantir que cap frame es perdi encara que el render sigui més lent que real-time.
@@ -332,12 +319,5 @@ export async function recordAnimation(
   recorder.stop();
   const blob = await done;
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `zeba-aplicacions.${actualFormat}`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, "webm");
 }
