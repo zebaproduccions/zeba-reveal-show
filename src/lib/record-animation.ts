@@ -203,7 +203,7 @@ export async function recordAnimation(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "zeba-aplicacions.webm";
+  a.download = `zeba-aplicacions.${actualFormat}`;
   document.body.appendChild(a);
   a.click();
   a.remove();
