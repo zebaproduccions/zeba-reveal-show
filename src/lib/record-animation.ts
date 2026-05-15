@@ -117,8 +117,11 @@ function drawFrame(
   });
 }
 
+export type RecordFormat = "webm" | "mp4";
+
 export async function recordAnimation(
   onProgress?: (p: number) => void,
+  format: RecordFormat = "webm",
 ): Promise<void> {
   const W = 1920;
   const H = 1080;
@@ -135,15 +138,29 @@ export async function recordAnimation(
   ]);
   const imgs = { zeba, apps: [zebby, zuite, mcp] };
 
-  // Determine supported mime
-  const mimeCandidates = [
+  // Determine supported mime based on requested format
+  const mp4Candidates = [
+    "video/mp4;codecs=avc1.42E01E",
+    "video/mp4;codecs=h264",
+    "video/mp4",
+  ];
+  const webmCandidates = [
     "video/webm;codecs=vp9",
     "video/webm;codecs=vp8",
     "video/webm",
   ];
+  const candidates = format === "mp4" ? mp4Candidates : webmCandidates;
   const mimeType =
-    mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
+    candidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
+    webmCandidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
     "video/webm";
+  const actualFormat = mimeType.startsWith("video/mp4") ? "mp4" : "webm";
+
+  if (format === "mp4" && actualFormat !== "mp4") {
+    console.warn(
+      "MP4 no és suportat per aquest navegador, gravant en WebM. Prova Chrome/Edge recents o Safari.",
+    );
+  }
 
   const stream = canvas.captureStream(60);
   const recorder = new MediaRecorder(stream, {
@@ -186,7 +203,7 @@ export async function recordAnimation(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "zeba-aplicacions.webm";
+  a.download = `zeba-aplicacions.${actualFormat}`;
   document.body.appendChild(a);
   a.click();
   a.remove();
