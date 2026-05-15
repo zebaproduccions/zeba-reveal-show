@@ -123,8 +123,8 @@ export async function recordAnimation(
   onProgress?: (p: number) => void,
   format: RecordFormat = "webm",
 ): Promise<void> {
-  const W = 1920;
-  const H = 1080;
+  const W = 3840;
+  const H = 2160;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
