@@ -57,7 +57,8 @@ function drawFrame(
   // ===== Subtitle: starts 1000ms, char by char =====
   const charDelay = 40;
   const charDur = 350;
-  ctx.font = `400 44px "Gentona", "Mulish", "Inter", "Helvetica Neue", Arial, sans-serif`;
+  const fontSize = Math.round(H * 0.0407); // ~44px @1080, ~88px @2160
+  ctx.font = `400 ${fontSize}px "Gentona", "Mulish", "Inter", "Helvetica Neue", Arial, sans-serif`;
   ctx.fillStyle = "#0a0a0a";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
@@ -123,8 +124,8 @@ export async function recordAnimation(
   onProgress?: (p: number) => void,
   format: RecordFormat = "webm",
 ): Promise<void> {
-  const W = 1920;
-  const H = 1080;
+  const W = 3840;
+  const H = 2160;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -165,7 +166,7 @@ export async function recordAnimation(
   const stream = canvas.captureStream(60);
   const recorder = new MediaRecorder(stream, {
     mimeType,
-    videoBitsPerSecond: 8_000_000,
+    videoBitsPerSecond: 40_000_000,
   });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (e) => {
