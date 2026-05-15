@@ -126,7 +126,7 @@ type VideoFrameConstructorLike = new (
   init: { timestamp: number; duration?: number },
 ) => VideoFrameLike;
 type VideoEncoderLike = {
-  configure: (config: Record<string, unknown>) => void;
+  configure: (config: VideoEncoderConfig) => void;
   encode: (frame: VideoFrameLike, options?: { keyFrame?: boolean }) => void;
   flush: () => Promise<void>;
   close: () => void;
@@ -136,9 +136,7 @@ type VideoEncoderConstructorLike = {
     output: (chunk: unknown, meta?: unknown) => void;
     error: (error: unknown) => void;
   }): VideoEncoderLike;
-  isConfigSupported?: (
-    config: Record<string, unknown>,
-  ) => Promise<{ supported: boolean; config?: Record<string, unknown> }>;
+  isConfigSupported?: (config: VideoEncoderConfig) => Promise<VideoEncoderSupport>;
 };
 
 function downloadBlob(blob: Blob, extension: RecordFormat) {
@@ -157,8 +155,8 @@ async function getSupportedMp4Config(
   W: number,
   H: number,
   FPS: number,
-) {
-  const baseConfig = {
+): Promise<VideoEncoderConfig> {
+  const baseConfig: Omit<VideoEncoderConfig, "codec"> = {
     width: W,
     height: H,
     bitrate: 40_000_000,
@@ -166,7 +164,7 @@ async function getSupportedMp4Config(
     latencyMode: "quality",
     avc: { format: "avc" },
   };
-  const configs = [
+  const configs: VideoEncoderConfig[] = [
     { ...baseConfig, codec: "avc1.640034" },
     { ...baseConfig, codec: "avc1.640033" },
     { ...baseConfig, codec: "avc1.4D4034" },
