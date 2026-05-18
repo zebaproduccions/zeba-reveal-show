@@ -346,8 +346,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
 
   ctx.restore();
 
-  // ---- Sea waves ----
-  drawWaves(ctx, proj, scaleNow, fadeIn * (scaleNow > 200 ? 0.9 : 0.5));
+  // ---- Sea waves removed ----
 
   // ---- Scene 1: blue circle around Catalonia ----
   if (t < T.zoom1to2_start + 200) {
