@@ -11,28 +11,64 @@ export type Geo = {
   aves: { id: string; name: string; sub?: string; lonLat: [number, number] }[];
 };
 
-const COSTA_BRAVA_COAST: [number, number][] = [
-  [3.319, 42.323], // Cap de Creus
-  [3.21, 42.27], // Roses
-  [3.18, 42.18],
-  [3.12, 42.12], // L'Escala
-  [3.21, 42.0], // Begur
-  [3.18, 41.92],
-  [3.09, 41.83], // Palamós
-  [3.03, 41.78], // Sant Feliu de Guíxols
-  [2.92, 41.72], // Tossa
-  [2.85, 41.69], // Lloret de Mar
-  [2.79, 41.67], // Blanes
-  [2.65, 41.63],
-  [2.45, 41.55],
-  [2.3, 41.48],
-  [2.2, 41.42], // Barcelona
-  [2.12, 41.36],
-  [2.0, 41.3], // El Prat
-  [1.85, 41.23],
-  [1.65, 41.13],
-  [1.25, 41.12], // Tarragona
-];
+// Costa Brava endpoints (Blanes → Cap de Creus). The actual polyline is
+// extracted from the Girona province boundary at runtime so it follows the
+// real coastline.
+const COSTA_BRAVA_START: [number, number] = [2.79, 41.67]; // Blanes
+const COSTA_BRAVA_END: [number, number] = [3.319, 42.323]; // Cap de Creus
+
+function dist2(a: [number, number], b: [number, number]) {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
+  return dx * dx + dy * dy;
+}
+
+function extractRings(geom: Geometry): [number, number][][] {
+  if (geom.type === "Polygon") return geom.coordinates.map((r) => r as [number, number][]);
+  if (geom.type === "MultiPolygon")
+    return geom.coordinates.flatMap((p) => p.map((r) => r as [number, number][]));
+  return [];
+}
+
+function extractCostaBrava(gironaFeature: Feature): [number, number][] {
+  const rings = extractRings(gironaFeature.geometry);
+  let best: { ring: [number, number][]; iStart: number; iEnd: number; score: number } | null = null;
+  for (const ring of rings) {
+    let iS = 0;
+    let iE = 0;
+    let dS = Infinity;
+    let dE = Infinity;
+    for (let i = 0; i < ring.length; i++) {
+      const ds = dist2(ring[i], COSTA_BRAVA_START);
+      const de = dist2(ring[i], COSTA_BRAVA_END);
+      if (ds < dS) {
+        dS = ds;
+        iS = i;
+      }
+      if (de < dE) {
+        dE = de;
+        iE = i;
+      }
+    }
+    const score = dS + dE;
+    if (!best || score < best.score) best = { ring, iStart: iS, iEnd: iE, score };
+  }
+  if (!best) return [COSTA_BRAVA_START, COSTA_BRAVA_END];
+  const { ring, iStart, iEnd } = best;
+  const N = ring.length;
+  const forward: [number, number][] = [];
+  for (let i = iStart; i !== iEnd; i = (i + 1) % N) forward.push(ring[i]);
+  forward.push(ring[iEnd]);
+  const backward: [number, number][] = [];
+  for (let i = iStart; i !== iEnd; i = (i - 1 + N) % N) backward.push(ring[i]);
+  backward.push(ring[iEnd]);
+  const pathLen = (pts: [number, number][]) => {
+    let s = 0;
+    for (let i = 1; i < pts.length; i++) s += Math.sqrt(dist2(pts[i], pts[i - 1]));
+    return s;
+  };
+  return pathLen(forward) < pathLen(backward) ? forward : backward;
+}
 
 let cache: Promise<Geo> | null = null;
 
