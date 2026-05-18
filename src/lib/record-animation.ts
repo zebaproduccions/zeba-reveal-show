@@ -377,20 +377,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     }
   }
 
-  // ---- Pyrenees mountain icons (Scene 2 onwards) ----
-  if (scaleNow > 1500) {
-    const alpha = clamp((scaleNow - 1500) / 1200) * 0.9;
-    const positions: [number, number][] = [
-      [1.55, 42.55],
-      [1.95, 42.45],
-      [0.85, 42.7],
-    ];
-    for (const [lon, lat] of positions) {
-      const pt = proj([lon, lat]);
-      if (!pt) continue;
-      drawMountain(ctx, pt[0], pt[1], scaleNow * 0.015, alpha);
-    }
-  }
+  // ---- Pyrenees mountain icons removed ----
 
   // ---- Costa Brava coast trace ----
   if (t >= T.coast_start && t < T.zoom2to3_start + 400) {
