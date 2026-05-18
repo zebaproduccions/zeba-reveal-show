@@ -60,17 +60,19 @@ const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeOutExpo = (t: number) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
 const clamp = (n: number, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, n));
 
-// Build a projection sized to fit a bbox into canvas
+// Build a projection sized to fit a bbox into canvas.
+// Use a LineString instead of a Polygon: d3-geo treats spherical polygon winding
+// specially, and a bbox polygon can be interpreted as the rest of the globe.
 function projForBbox(bbox: [[number, number], [number, number]], W: number, H: number, pad = 60) {
-  const poly = {
-    type: "Polygon" as const,
-    coordinates: [[
+  const outline = {
+    type: "LineString" as const,
+    coordinates: [
       [bbox[0][0], bbox[0][1]],
       [bbox[1][0], bbox[0][1]],
       [bbox[1][0], bbox[1][1]],
       [bbox[0][0], bbox[1][1]],
       [bbox[0][0], bbox[0][1]],
-    ]],
+    ],
   };
   const p = geoMercator();
   p.fitExtent(
@@ -78,7 +80,7 @@ function projForBbox(bbox: [[number, number], [number, number]], W: number, H: n
       [pad, pad],
       [W - pad, H - pad],
     ],
-    poly,
+    outline,
   );
   return { scale: p.scale(), translate: p.translate() as [number, number] };
 }
