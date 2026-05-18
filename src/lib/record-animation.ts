@@ -291,40 +291,30 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
   ctx.save();
   ctx.globalAlpha = fadeIn;
 
-  // ---- Country boundary detail varies with zoom ----
-  const showAllCountries = scaleNow < 1200;
+  // ---- Country fills + strokes ----
+  // Use hairlines and avoid stroking layers that overlap (the coast was
+  // drawn 3× before: world + Spain provinces + Catalonia provinces).
+  const strokeWorld = scaleNow < 800;
+  const strokeSpain = scaleNow >= 800 && scaleNow < 2000;
+  const strokeCatalonia = scaleNow >= 800;
 
-  if (showAllCountries) {
-    // Europe scene: draw all countries, faintly
-    ctx.fillStyle = LAND;
-    ctx.strokeStyle = OUTLINE_FAINT;
-    ctx.lineWidth = 1;
-    for (const f of geoCache.worldCountries.features) {
-      ctx.beginPath();
-      path(f);
-      ctx.fill();
-      ctx.stroke();
-    }
-  } else {
-    // Closer: draw only countries near Iberia for performance
-    ctx.fillStyle = LAND;
-    ctx.strokeStyle = OUTLINE_FAINT;
-    ctx.lineWidth = 1.2;
-    for (const f of geoCache.worldCountries.features) {
-      ctx.beginPath();
-      path(f);
-      ctx.fill();
-      ctx.stroke();
-    }
+  ctx.fillStyle = LAND;
+  ctx.strokeStyle = OUTLINE_FAINT;
+  ctx.lineWidth = 0.5;
+  for (const f of geoCache.worldCountries.features) {
+    ctx.beginPath();
+    path(f);
+    ctx.fill();
+    if (strokeWorld) ctx.stroke();
   }
 
-  // ---- Spain provinces (subtle, only visible when zoomed in) ----
-  if (scaleNow > 500) {
-    const alpha = clamp((scaleNow - 500) / 600);
+  // ---- Spain provinces (subtle, only at mid zoom) ----
+  if (strokeSpain) {
+    const alpha = clamp((scaleNow - 800) / 600);
     ctx.save();
-    ctx.globalAlpha *= alpha;
+    ctx.globalAlpha *= alpha * 0.6;
     ctx.strokeStyle = OUTLINE_FAINT;
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = 0.5;
     for (const f of geoCache.spainProvinces.features) {
       ctx.beginPath();
       path(f);
@@ -333,15 +323,21 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     ctx.restore();
   }
 
-  // ---- Catalonia highlight ----
+  // ---- Catalonia highlight (fill always; stroke only when close) ----
   ctx.fillStyle = LAND_DARK;
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = Math.max(0.8, scaleNow / 2200);
   for (const f of geoCache.cataloniaProvinces) {
     ctx.beginPath();
     path(f);
     ctx.fill();
-    ctx.stroke();
+  }
+  if (strokeCatalonia) {
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 0.6;
+    for (const f of geoCache.cataloniaProvinces) {
+      ctx.beginPath();
+      path(f);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
