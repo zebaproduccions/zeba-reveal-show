@@ -394,7 +394,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     const target = total * easeOut(prog);
     ctx.save();
     ctx.strokeStyle = BLUE;
-    ctx.lineWidth = Math.max(3, scaleNow * 0.0025);
+    ctx.lineWidth = Math.max(1, scaleNow * 0.0009);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
