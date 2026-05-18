@@ -1,14 +1,17 @@
-import logoZeba from "@/assets/logo-zeba.png";
-import logoZebby from "@/assets/logo-zebby.png";
-import logoZuite from "@/assets/logo-zuite.png";
-import logoMcp from "@/assets/logo-mcp.png";
+import familyImgSrc from "@/assets/family-illustration.png";
 
-const SUBTITLE = "Les nostres aplicacions";
 const START_DELAY = 1000; // ms — pantalla en blanc inicial
-const DURATION = 6000; // ms (5000 + 1000 delay)
+const DURATION = 7000; // ms total
+
+const NAVY = "#0a2342";
+const TEAL = "#5cb8b2";
+const MUTED = "#737373";
 
 function easeOutExpo(t: number) {
   return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -21,10 +24,17 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+type Stat = { value: string; unit: string; label: string };
+const stats: Stat[] = [
+  { value: "19", unit: "setmanes", label: "per progenitor" },
+  { value: "32", unit: "setmanes", label: "en famílies monoparentals" },
+  { value: "100%", unit: "", label: "de la base reguladora" },
+];
+
 function drawFrame(
   ctx: CanvasRenderingContext2D,
-  t: number, // elapsed ms
-  imgs: { zeba: HTMLImageElement; apps: HTMLImageElement[] },
+  tRaw: number,
+  family: HTMLImageElement,
   W: number,
   H: number,
 ) {
@@ -32,90 +42,173 @@ function drawFrame(
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
-  // Offset everything by START_DELAY for blank intro
-  t = t - START_DELAY;
+  const t = tRaw - START_DELAY;
+  if (t < 0) return;
 
-  // ===== Zeba main logo: 0 - 1000ms =====
-  const zebaP = Math.max(0, Math.min(1, t / 1000));
-  const zebaE = easeOutExpo(zebaP);
-  const zebaOpacity = zebaE;
-  const zebaScale = 0.93 + 0.07 * zebaE;
-  const zebaY = 12 * (1 - zebaE);
+  // Layout
+  const leftX = W * 0.08;
+  const rightX = W * 0.55;
+  const rightCenterX = rightX + (W - rightX - W * 0.08) / 2;
+  const centerY = H / 2;
 
-  const zebaW = W * 0.32;
-  const zebaH = (zebaW / imgs.zeba.width) * imgs.zeba.height;
-  const zebaCx = W / 2;
-  const zebaCy = H * 0.28 + zebaY;
-
-  ctx.save();
-  ctx.globalAlpha = zebaOpacity;
-  ctx.translate(zebaCx, zebaCy);
-  ctx.scale(zebaScale, zebaScale);
-  ctx.drawImage(imgs.zeba, -zebaW / 2, -zebaH / 2, zebaW, zebaH);
-  ctx.restore();
-
-  // ===== Subtitle: starts 1000ms, char by char =====
-  const charDelay = 40;
-  const charDur = 350;
-  const fontSize = Math.round(H * 0.0407); // ~44px @1080, ~88px @2160
-  ctx.font = `400 ${fontSize}px "Gentona", "Mulish", "Inter", "Helvetica Neue", Arial, sans-serif`;
-  ctx.fillStyle = "#0a0a0a";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-
-  // Measure full subtitle to center it
-  const totalWidth = ctx.measureText(SUBTITLE).width;
-  let cursorX = W / 2 - totalWidth / 2;
-  const subY = H * 0.52;
-
-  for (let i = 0; i < SUBTITLE.length; i++) {
-    const char = SUBTITLE[i];
-    const start = 1000 + i * charDelay;
-    const p = Math.max(0, Math.min(1, (t - start) / charDur));
+  // ===== Family illustration (right): fades in early =====
+  {
+    const p = Math.max(0, Math.min(1, t / 1200));
     const e = easeOutExpo(p);
-    const cw = ctx.measureText(char).width;
+    const targetW = (W - rightX - W * 0.08) * 0.95;
+    const imgW = targetW;
+    const imgH = (imgW / family.width) * family.height;
+    const maxH = H * 0.78;
+    const scale = imgH > maxH ? maxH / imgH : 1;
+    const dw = imgW * scale;
+    const dh = imgH * scale;
+
+    // Soft teal blob behind
+    ctx.save();
+    ctx.globalAlpha = 0.18 * e;
+    ctx.fillStyle = TEAL;
+    ctx.filter = `blur(${Math.round(H * 0.04)}px)`;
+    ctx.beginPath();
+    ctx.ellipse(rightCenterX, centerY, dw * 0.42, dh * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = e;
+    const yOffset = 20 * (1 - e);
+    ctx.drawImage(family, rightCenterX - dw / 2, centerY - dh / 2 + yOffset, dw, dh);
+    ctx.restore();
+  }
+
+  // ===== Kicker (eyebrow) =====
+  ctx.textBaseline = "alphabetic";
+  {
+    const start = 1000;
+    const p = Math.max(0, Math.min(1, (t - start) / 800));
+    const e = easeOutExpo(p);
     if (p > 0) {
       ctx.save();
       ctx.globalAlpha = e;
-      ctx.fillText(char, cursorX, subY + 8 * (1 - e));
+      ctx.fillStyle = TEAL;
+      const fs = Math.round(H * 0.018);
+      ctx.font = `600 ${fs}px "Gentona", "Mulish", "Inter", Arial, sans-serif`;
+      ctx.textAlign = "left";
+      const text = "NOVETATS LABORALS · ESPANYA";
+      // letter-spacing emulate
+      let x = leftX;
+      const y = H * 0.18 + 10 * (1 - e);
+      const spacing = fs * 0.18;
+      for (const ch of text) {
+        ctx.fillText(ch, x, y);
+        x += ctx.measureText(ch).width + spacing;
+      }
       ctx.restore();
     }
-    cursorX += cw;
   }
 
-  // ===== Three logos: starts 2000ms, stagger 300ms =====
-  const appW = W * 0.13;
-  const gap = W * 0.06;
-  const totalAppsW = imgs.apps.length * appW + (imgs.apps.length - 1) * gap;
-  let appX = W / 2 - totalAppsW / 2;
-  const appY = H * 0.72;
-
-  imgs.apps.forEach((img, i) => {
-    const aw = appW;
-    const ah = (aw / img.width) * img.height;
-    const start = 2000 + i * 300;
-    const p = Math.max(0, Math.min(1, (t - start) / 800));
+  // ===== Title =====
+  {
+    const start = 1150;
+    const p = Math.max(0, Math.min(1, (t - start) / 1000));
     const e = easeOutExpo(p);
-    const opacity = e;
-    const scale = 0.95 + 0.05 * e;
-    const y = appY + 16 * (1 - e);
-
     if (p > 0) {
       ctx.save();
-      ctx.globalAlpha = opacity;
-      // soft shadow
-      ctx.shadowColor = "rgba(0,0,0,0.12)";
-      ctx.shadowBlur = 24;
-      ctx.shadowOffsetY = 8;
-      const cx = appX + aw / 2;
-      const cy = y;
-      ctx.translate(cx, cy);
-      ctx.scale(scale, scale);
-      ctx.drawImage(img, -aw / 2, -ah / 2, aw, ah);
+      ctx.globalAlpha = e;
+      ctx.fillStyle = NAVY;
+      const fs = Math.round(H * 0.072);
+      ctx.font = `700 ${fs}px "Gentona", "Mulish", "Inter", Arial, sans-serif`;
+      ctx.textAlign = "left";
+      const y1 = H * 0.265 + 18 * (1 - e);
+      const lineH = fs * 1.05;
+      ctx.fillText("Permís per naixement", leftX, y1);
+      ctx.fillText("i cura del menor", leftX, y1 + lineH);
       ctx.restore();
     }
-    appX += aw + gap;
-  });
+  }
+
+  // ===== Teal underline =====
+  {
+    const start = 1900;
+    const p = Math.max(0, Math.min(1, (t - start) / 700));
+    const e = easeOutExpo(p);
+    if (p > 0) {
+      ctx.save();
+      ctx.fillStyle = TEAL;
+      const w = W * 0.09 * e;
+      const h = Math.max(3, Math.round(H * 0.004));
+      ctx.fillRect(leftX, H * 0.46, w, h);
+      ctx.restore();
+    }
+  }
+
+  // ===== Stats =====
+  {
+    const baseY = H * 0.56;
+    const rowH = H * 0.085;
+    const valueFs = Math.round(H * 0.062);
+    const unitFs = Math.round(H * 0.03);
+    const labelFs = Math.round(H * 0.022);
+
+    stats.forEach((s, i) => {
+      const start = 2400 + i * 350;
+      const p = Math.max(0, Math.min(1, (t - start) / 700));
+      const e = easeOutExpo(p);
+      if (p <= 0) return;
+
+      const xOffset = -30 * (1 - e);
+      const y = baseY + i * rowH;
+
+      ctx.save();
+      ctx.globalAlpha = e;
+
+      // Animated number
+      const numeric = parseInt(s.value.replace(/\D/g, ""), 10);
+      const suffix = s.value.replace(/[0-9]/g, "");
+      const np = Math.max(0, Math.min(1, (t - start) / 900));
+      const ne = easeOutCubic(np);
+      const displayVal = Math.round(numeric * ne) + suffix;
+
+      ctx.fillStyle = NAVY;
+      ctx.font = `700 ${valueFs}px "Gentona", "Mulish", "Inter", Arial, sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      const valX = leftX + xOffset;
+      ctx.fillText(displayVal, valX, y);
+      const valW = ctx.measureText(displayVal).width;
+
+      let cursorX = valX + valW + valueFs * 0.25;
+
+      if (s.unit) {
+        ctx.font = `600 ${unitFs}px "Gentona", "Mulish", "Inter", Arial, sans-serif`;
+        ctx.fillStyle = NAVY;
+        ctx.fillText(s.unit, cursorX, y);
+        cursorX += ctx.measureText(s.unit).width + unitFs * 0.5;
+      }
+
+      ctx.font = `400 ${labelFs}px "Gentona", "Mulish", "Inter", Arial, sans-serif`;
+      ctx.fillStyle = MUTED;
+      ctx.fillText(s.label, cursorX, y);
+
+      ctx.restore();
+    });
+  }
+
+  // ===== Footer note =====
+  {
+    const start = 4200;
+    const p = Math.max(0, Math.min(1, (t - start) / 700));
+    const e = easeOutExpo(p);
+    if (p > 0) {
+      ctx.save();
+      ctx.globalAlpha = e;
+      ctx.fillStyle = MUTED;
+      const fs = Math.round(H * 0.016);
+      ctx.font = `400 ${fs}px "Gentona", "Mulish", "Inter", Arial, sans-serif`;
+      ctx.textAlign = "left";
+      ctx.fillText("RDL 9/2025 · vigent des del 31/07/2025", leftX, H * 0.9);
+      ctx.restore();
+    }
+  }
 }
 
 export type RecordFormat = "webm" | "mp4";
@@ -143,7 +236,7 @@ function downloadBlob(blob: Blob, extension: RecordFormat) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `zeba-aplicacions.${extension}`;
+  a.download = `permis-naixement.${extension}`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -184,7 +277,7 @@ async function getSupportedMp4Config(
 
 async function recordMp4WithWebCodecs(
   ctx: CanvasRenderingContext2D,
-  imgs: { zeba: HTMLImageElement; apps: HTMLImageElement[] },
+  family: HTMLImageElement,
   W: number,
   H: number,
   onProgress?: (p: number) => void,
@@ -228,7 +321,7 @@ async function recordMp4WithWebCodecs(
   for (let f = 0; f < totalFrames; f++) {
     const timestamp = f * frameDurationUs;
     const duration = f === totalFrames - 1 ? totalDurationUs - timestamp : frameDurationUs;
-    drawFrame(ctx, (f / FPS) * 1000, imgs, W, H);
+    drawFrame(ctx, (f / FPS) * 1000, family, W, H);
     const frame = new VideoFrameCtor(ctx.canvas, { timestamp, duration });
     encoder.encode(frame, { keyFrame: f % FPS === 0 });
     frame.close();
@@ -256,32 +349,21 @@ export async function recordAnimation(
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
 
-  const [zeba, zebby, zuite, mcp] = await Promise.all([
-    loadImage(logoZeba),
-    loadImage(logoZebby),
-    loadImage(logoZuite),
-    loadImage(logoMcp),
-  ]);
-  const imgs = { zeba, apps: [zebby, zuite, mcp] };
+  const family = await loadImage(familyImgSrc);
 
   if (format === "mp4") {
-    await recordMp4WithWebCodecs(ctx, imgs, W, H, onProgress);
+    await recordMp4WithWebCodecs(ctx, family, W, H, onProgress);
     return;
   }
 
-  // WebM fallback/export path. MP4 is handled above with WebCodecs + a real MP4 muxer.
   const webmCandidates = [
     "video/webm;codecs=vp9",
     "video/webm;codecs=vp8",
     "video/webm",
   ];
   const mimeType =
-    webmCandidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
-    webmCandidates.find((m) => MediaRecorder.isTypeSupported(m)) ||
-    "video/webm";
+    webmCandidates.find((m) => MediaRecorder.isTypeSupported(m)) || "video/webm";
 
-  // captureStream(0) → no automatic capture; we trigger requestFrame() manually
-  // per garantir que cap frame es perdi encara que el render sigui més lent que real-time.
   const FPS = 30;
   const stream = canvas.captureStream(0);
   const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
@@ -299,21 +381,17 @@ export async function recordAnimation(
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
-  // timeslice 100ms → flush periòdic perquè el muxer MP4 no truncai el fitxer
   recorder.start(100);
 
-  // Render frame-by-frame en temps virtual (no real-time) per no perdre cap frame
   const totalFrames = Math.round((DURATION / 1000) * FPS);
   for (let f = 0; f <= totalFrames; f++) {
     const t = (f / FPS) * 1000;
-    drawFrame(ctx, t, imgs, W, H);
+    drawFrame(ctx, t, family, W, H);
     track.requestFrame();
     onProgress?.(Math.min(1, t / DURATION));
-    // cedeix al main thread perquè el recorder pugui processar el frame
     await new Promise((r) => setTimeout(r, 1000 / FPS));
   }
 
-  // hold last frame perquè el muxer tanqui correctament
   await new Promise((r) => setTimeout(r, 500));
 
   recorder.stop();
