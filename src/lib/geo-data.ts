@@ -96,11 +96,16 @@ export function loadGeo(): Promise<Geo> {
       catalanNames.has((f.properties as { name?: string })?.name ?? ""),
     );
 
+    const girona = cataloniaProvinces.find(
+      (f) => (f.properties as { name?: string })?.name === "Girona",
+    );
+    const costaBravaCoast = girona ? extractCostaBrava(girona) : [COSTA_BRAVA_START, COSTA_BRAVA_END];
+
     return {
       worldCountries,
       spainProvinces,
       cataloniaProvinces,
-      costaBravaCoast: COSTA_BRAVA_COAST,
+      costaBravaCoast,
       cities: [
         { name: "Roses", lonLat: [3.176, 42.262] },
         { name: "L'Escala", lonLat: [3.131, 42.121] },
