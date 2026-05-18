@@ -25,16 +25,16 @@ const MUTED = "#6c5d44";
 // Bbox per scene [[minLon, minLat], [maxLon, maxLat]]
 const SCENE_BBOX: [[number, number], [number, number]][] = [
   [
-    [-15, 34],
-    [30, 62],
-  ], // Europe
+    [-11, 36],
+    [12, 52],
+  ], // Western Europe (Iberia + France + UK south)
   [
-    [-0.2, 40.4],
-    [3.6, 42.9],
-  ], // Catalonia
+    [-2, 39.8],
+    [5, 43.4],
+  ], // NE Spain / Catalonia
   [
     [1.5, 41.1],
-    [3.5, 42.45],
+    [3.6, 42.5],
   ], // East Catalonia / coast
 ];
 
