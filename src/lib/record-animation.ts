@@ -89,32 +89,45 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
+// Interpolate bbox geographically so the camera always moves straight to the
+// target region (no curved drift from lerping projected pixel translates while
+// scale changes non-linearly).
+function lerpBbox(
+  a: [[number, number], [number, number]],
+  b: [[number, number], [number, number]],
+  p: number,
+): [[number, number], [number, number]] {
+  return [
+    [lerp(a[0][0], b[0][0], p), lerp(a[0][1], b[0][1], p)],
+    [lerp(a[1][0], b[1][0], p), lerp(a[1][1], b[1][1], p)],
+  ];
+}
+
 function getProjection(t: number, W: number, H: number): GeoProjection {
   const pads = [80, 100, 120];
-  const targets = SCENE_BBOX.map((b, i) => projForBbox(b, W, H, pads[i]));
-
-  let scale: number;
-  let tx: number;
-  let ty: number;
+  let bbox: [[number, number], [number, number]];
+  let pad: number;
 
   if (t < T.zoom1to2_start) {
-    ({ scale, translate: [tx, ty] } = targets[0] as { scale: number; translate: [number, number] });
+    bbox = SCENE_BBOX[0];
+    pad = pads[0];
   } else if (t < T.zoom1to2_end) {
     const p = easeInOut(clamp((t - T.zoom1to2_start) / (T.zoom1to2_end - T.zoom1to2_start)));
-    scale = Math.exp(lerp(Math.log(targets[0].scale), Math.log(targets[1].scale), p));
-    tx = lerp(targets[0].translate[0], targets[1].translate[0], p);
-    ty = lerp(targets[0].translate[1], targets[1].translate[1], p);
+    bbox = lerpBbox(SCENE_BBOX[0], SCENE_BBOX[1], p);
+    pad = lerp(pads[0], pads[1], p);
   } else if (t < T.zoom2to3_start) {
-    ({ scale, translate: [tx, ty] } = targets[1] as { scale: number; translate: [number, number] });
+    bbox = SCENE_BBOX[1];
+    pad = pads[1];
   } else if (t < T.zoom2to3_end) {
     const p = easeInOut(clamp((t - T.zoom2to3_start) / (T.zoom2to3_end - T.zoom2to3_start)));
-    scale = Math.exp(lerp(Math.log(targets[1].scale), Math.log(targets[2].scale), p));
-    tx = lerp(targets[1].translate[0], targets[2].translate[0], p);
-    ty = lerp(targets[1].translate[1], targets[2].translate[1], p);
+    bbox = lerpBbox(SCENE_BBOX[1], SCENE_BBOX[2], p);
+    pad = lerp(pads[1], pads[2], p);
   } else {
-    ({ scale, translate: [tx, ty] } = targets[2] as { scale: number; translate: [number, number] });
+    bbox = SCENE_BBOX[2];
+    pad = pads[2];
   }
-  return geoMercator().scale(scale).translate([tx, ty]);
+  const { scale, translate } = projForBbox(bbox, W, H, pad);
+  return geoMercator().scale(scale).translate(translate);
 }
 
 // ---------- Decorative sea waves ----------
@@ -333,8 +346,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
 
   ctx.restore();
 
-  // ---- Sea waves ----
-  drawWaves(ctx, proj, scaleNow, fadeIn * (scaleNow > 200 ? 0.9 : 0.5));
+  // ---- Sea waves removed ----
 
   // ---- Scene 1: blue circle around Catalonia ----
   if (t < T.zoom1to2_start + 200) {
@@ -365,20 +377,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     }
   }
 
-  // ---- Pyrenees mountain icons (Scene 2 onwards) ----
-  if (scaleNow > 1500) {
-    const alpha = clamp((scaleNow - 1500) / 1200) * 0.9;
-    const positions: [number, number][] = [
-      [1.55, 42.55],
-      [1.95, 42.45],
-      [0.85, 42.7],
-    ];
-    for (const [lon, lat] of positions) {
-      const pt = proj([lon, lat]);
-      if (!pt) continue;
-      drawMountain(ctx, pt[0], pt[1], scaleNow * 0.015, alpha);
-    }
-  }
+  // ---- Pyrenees mountain icons removed ----
 
   // ---- Costa Brava coast trace ----
   if (t >= T.coast_start && t < T.zoom2to3_start + 400) {
@@ -395,7 +394,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     const target = total * easeOut(prog);
     ctx.save();
     ctx.strokeStyle = BLUE;
-    ctx.lineWidth = Math.max(3, scaleNow * 0.0025);
+    ctx.lineWidth = Math.max(1, scaleNow * 0.0009);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
