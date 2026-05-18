@@ -1,23 +1,48 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { useState } from "react";
-import logoZeba from "@/assets/logo-zeba.png";
-import logoZebby from "@/assets/logo-zebby.png";
-import logoZuite from "@/assets/logo-zuite.png";
-import logoMcp from "@/assets/logo-mcp.png";
+import { useEffect, useState } from "react";
+import familyImg from "@/assets/family-illustration.png";
 import { recordAnimation } from "@/lib/record-animation";
 
 export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const subtitle = "Les nostres aplicacions";
+const NAVY = "#0a2342";
+const TEAL = "#5cb8b2";
 
-const apps = [
-  { src: logoZebby, alt: "zebby" },
-  { src: logoZuite, alt: "zuite" },
-  { src: logoMcp, alt: "mcp" },
+const stats = [
+  { value: "19", unit: "setmanes", label: "per progenitor" },
+  { value: "32", unit: "setmanes", label: "en famílies monoparentals" },
+  { value: "100%", unit: "", label: "de la base reguladora" },
 ];
+
+function AnimatedNumber({ target, delay }: { target: string; delay: number }) {
+  const numeric = parseInt(target.replace(/\D/g, ""), 10);
+  const suffix = target.replace(/[0-9]/g, "");
+  const [val, setVal] = useState(0);
+
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now() + delay * 1000;
+    const dur = 900;
+    const tick = (now: number) => {
+      const t = Math.max(0, Math.min(1, (now - start) / dur));
+      const eased = 1 - Math.pow(1 - t, 3);
+      setVal(Math.round(numeric * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [numeric, delay]);
+
+  return (
+    <span>
+      {val}
+      {suffix}
+    </span>
+  );
+}
 
 function Index() {
   const [recording, setRecording] = useState<null | "webm" | "mp4">(null);
@@ -39,63 +64,122 @@ function Index() {
   };
 
   return (
-    <main className="relative min-h-screen w-full bg-white flex items-center justify-center px-6 py-16">
+    <main
+      className="relative min-h-screen w-full bg-white overflow-hidden"
+      style={{ fontFamily: '"Gentona", "Mulish", "Inter", system-ui, sans-serif' }}
+    >
       <div
         key={replayKey}
-        className="flex flex-col items-center gap-14 md:gap-20 max-w-5xl w-full"
+        className="mx-auto max-w-[1400px] px-10 lg:px-16 py-16 lg:py-24 grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-12 lg:gap-16 items-center min-h-screen"
       >
-        <motion.img
-          src={logoZeba}
-          alt="zeba"
-          initial={{ opacity: 0, scale: 0.93, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ delay: 1, duration: 1, ease: [0.22, 1, 0.36, 1] }}
-          className="w-[260px] md:w-[420px] h-auto select-none"
-          draggable={false}
-        />
+        {/* LEFT: title + stats */}
+        <div className="flex flex-col">
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1, duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-3"
+          >
+            <span
+              className="inline-block text-sm md:text-base tracking-[0.18em] uppercase font-semibold"
+              style={{ color: TEAL }}
+            >
+              Novetats laborals · Espanya
+            </span>
+          </motion.div>
 
-        <h1
-          aria-label={subtitle}
-          className="text-2xl md:text-4xl font-normal tracking-tight text-neutral-900 text-center overflow-hidden"
-          style={{ fontFamily: '"Gentona", "Mulish", "Inter", system-ui, sans-serif' }}
-        >
-          <span className="inline-flex flex-wrap justify-center">
-            {subtitle.split("").map((char, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
+          <motion.h1
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.15, duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="text-4xl md:text-6xl lg:text-[68px] font-bold leading-[1.02] tracking-tight"
+            style={{ color: NAVY }}
+          >
+            Permís per naixement
+            <br />
+            i cura del menor
+          </motion.h1>
+
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ delay: 1.9, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-6 h-[3px] w-40 origin-left rounded-full"
+            style={{ backgroundColor: TEAL }}
+          />
+
+          <div className="mt-12 flex flex-col gap-5">
+            {stats.map((s, i) => (
+              <motion.div
+                key={s.label}
+                initial={{ opacity: 0, x: -24 }}
+                animate={{ opacity: 1, x: 0 }}
                 transition={{
-                  delay: 2 + i * 0.04,
-                  duration: 0.35,
-                  ease: "easeOut",
+                  delay: 2.4 + i * 0.35,
+                  duration: 0.7,
+                  ease: [0.22, 1, 0.36, 1],
                 }}
-                className="inline-block whitespace-pre"
+                className="flex items-baseline gap-4"
               >
-                {char}
-              </motion.span>
+                <span
+                  className="text-5xl md:text-6xl font-bold tabular-nums leading-none"
+                  style={{ color: NAVY }}
+                >
+                  <AnimatedNumber target={s.value} delay={2.4 + i * 0.35} />
+                </span>
+                {s.unit && (
+                  <span
+                    className="text-2xl md:text-3xl font-semibold"
+                    style={{ color: NAVY }}
+                  >
+                    {s.unit}
+                  </span>
+                )}
+                <span className="text-lg md:text-xl text-neutral-500">
+                  {s.label}
+                </span>
+              </motion.div>
             ))}
-          </span>
-        </h1>
+          </div>
 
-        <div className="flex items-center justify-center gap-10 md:gap-20 flex-wrap">
-          {apps.map((app, i) => (
-            <motion.img
-              key={app.alt}
-              src={app.src}
-              alt={app.alt}
-              initial={{ opacity: 0, y: 16, scale: 0.95, filter: "blur(6px)" }}
-              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-              transition={{
-                delay: 3 + i * 0.3,
-                duration: 0.8,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              className="w-24 md:w-36 h-auto object-contain select-none drop-shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
-              draggable={false}
-            />
-          ))}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 4.2, duration: 0.8 }}
+            className="mt-12 text-sm tracking-wide text-neutral-500"
+          >
+            RDL 9/2025 · vigent des del 31/07/2025
+          </motion.p>
         </div>
+
+        {/* RIGHT: family illustration */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.8, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+          className="relative flex items-center justify-center"
+        >
+          {/* soft teal blob */}
+          <div
+            className="absolute inset-0 -z-10 mx-auto my-auto rounded-full blur-2xl"
+            style={{
+              backgroundColor: TEAL,
+              opacity: 0.18,
+              width: "78%",
+              height: "78%",
+              left: "11%",
+              top: "11%",
+            }}
+          />
+          <img
+            src={familyImg}
+            alt="Família amb un nadó"
+            width={1024}
+            height={1024}
+            className="w-full max-w-[560px] h-auto select-none"
+            draggable={false}
+          />
+        </motion.div>
       </div>
 
       {/* Controls */}
@@ -119,7 +203,8 @@ function Index() {
         <button
           onClick={() => handleDownload("mp4")}
           disabled={recording !== null}
-          className="text-sm px-5 py-2 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 transition disabled:opacity-60"
+          className="text-sm px-5 py-2 rounded-full text-white hover:opacity-90 transition disabled:opacity-60"
+          style={{ backgroundColor: NAVY }}
         >
           {recording === "mp4"
             ? `Gravant… ${Math.round(progress * 100)}%`
