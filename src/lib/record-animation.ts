@@ -339,19 +339,9 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     ctx.restore();
   }
 
-  // ---- Catalonia highlight (fill always; stroke only when close) ----
-  ctx.fillStyle = LAND_DARK;
-  for (const f of geoCache.cataloniaProvinces) {
-    ctx.beginPath();
-    path(f);
-    ctx.fill();
-  }
-
-  // At high zoom, redraw the world countries (skipping Spain) ON TOP of
-  // Catalonia. This covers any Catalonia overflow north of the France border.
-  // Additionally STROKE with LAND to expand the France polygon outward by a
-  // few px — this closes the white seam between Catalonia (dark) and France
-  // (light) caused by the two datasets having different boundary resolutions.
+  // Fill tiny mismatches between the coarse France/world layer and the more
+  // precise Catalonia province layer. Draw this UNDER Catalonia so it closes
+  // light gaps without cutting away the dark Catalonia fill.
   if (scaleNow >= 800) {
     ctx.save();
     ctx.fillStyle = LAND;
@@ -366,6 +356,18 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  // ---- Catalonia highlight (fill always; stroke only when close) ----
+  ctx.fillStyle = LAND_DARK;
+  ctx.strokeStyle = LAND_DARK;
+  ctx.lineWidth = scaleNow >= 800 ? 2.5 : 0.5;
+  ctx.lineJoin = "round";
+  for (const f of geoCache.cataloniaProvinces) {
+    ctx.beginPath();
+    path(f);
+    ctx.fill();
+    ctx.stroke();
   }
 
   if (strokeCatalonia) {
@@ -499,12 +501,13 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         // coastline). Exception: Roses sits at the top corner where there is
         // no sea room to the right — keep it inland (to the left).
         const isRoses = city.name === "Roses";
+        const labelDy = city.name === "L'Escala" ? -12 : city.name === "Lloret de Mar" ? 14 : 0;
         if (isRoses) {
           ctx.textAlign = "right";
-          ctx.fillText(city.name, pt[0] - 14, pt[1]);
+          ctx.fillText(city.name, pt[0] - 14, pt[1] + labelDy);
         } else {
           ctx.textAlign = "left";
-          ctx.fillText(city.name, pt[0] + 14, pt[1]);
+          ctx.fillText(city.name, pt[0] + 14, pt[1] + labelDy);
         }
       }
       ctx.restore();
