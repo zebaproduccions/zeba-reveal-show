@@ -13,9 +13,10 @@ export type Geo = {
 
 // Costa Brava endpoints (Blanes → Cap de Creus). The actual polyline is
 // extracted from the Girona province boundary at runtime so it follows the
-// real coastline.
+// real coastline. To change where the line starts/ends, edit the lon/lat
+// pairs below: [longitude, latitude] in decimal degrees (E positive, N positive).
 const COSTA_BRAVA_START: [number, number] = [2.79, 41.67]; // Blanes
-const COSTA_BRAVA_END: [number, number] = [3.319, 42.323]; // Cap de Creus
+const COSTA_BRAVA_END: [number, number] = [3.3175, 42.3225]; // Cap de Creus (tip)
 
 function dist2(a: [number, number], b: [number, number]) {
   const dx = a[0] - b[0];
@@ -67,7 +68,15 @@ function extractCostaBrava(gironaFeature: Feature): [number, number][] {
     for (let i = 1; i < pts.length; i++) s += Math.sqrt(dist2(pts[i], pts[i - 1]));
     return s;
   };
-  return pathLen(forward) < pathLen(backward) ? forward : backward;
+  const chosen = pathLen(forward) < pathLen(backward) ? forward : backward;
+  // Snap the first and last vertices to the exact requested endpoints so the
+  // line always reaches the configured start/end (the ring's closest vertex
+  // may be slightly off, especially at Cap de Creus).
+  if (chosen.length > 0) {
+    chosen[0] = COSTA_BRAVA_START;
+    chosen[chosen.length - 1] = COSTA_BRAVA_END;
+  }
+  return chosen;
 }
 
 let cache: Promise<Geo> | null = null;

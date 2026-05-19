@@ -301,7 +301,12 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
   ctx.fillStyle = LAND;
   ctx.strokeStyle = OUTLINE_FAINT;
   ctx.lineWidth = 0.5;
+  // At higher zoom, skip the world-atlas Spain polygon — its coastline is at
+  // a coarser resolution than spainProvinces and shows as a light-brown sliver
+  // along the coast. The spainProvinces layer below fills Spain consistently.
+  const skipSpainWorld = scaleNow >= 800;
   for (const f of geoCache.worldCountries.features) {
+    if (skipSpainWorld && (f.properties as { name?: string })?.name === "Spain") continue;
     ctx.beginPath();
     path(f);
     ctx.fill();
