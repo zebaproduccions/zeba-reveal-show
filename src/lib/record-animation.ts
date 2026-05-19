@@ -527,7 +527,10 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       sub?: string;
       delay: number;
     }[] = [
-      { lonLat: geoCache.aves[0].lonLat, icon: "train", title: "Girona AVE", sub: "Girona", delay: 0 },
+      // Pair each AVE with its airport on the SAME geo anchor so the two
+      // pictograms render perfectly stacked side-by-side (vertically), no
+      // overlap regardless of zoom.
+      { lonLat: geoCache.airports[0].lonLat, icon: "train", title: "Girona AVE", sub: "Girona", delay: 0 },
       {
         lonLat: geoCache.airports[0].lonLat,
         icon: "plane",
@@ -536,7 +539,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         delay: 250,
       },
       {
-        lonLat: geoCache.aves[1].lonLat,
+        lonLat: geoCache.airports[1].lonLat,
         icon: "train",
         title: "Barcelona AVE",
         sub: "Barcelona",
@@ -550,12 +553,13 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         delay: 750,
       },
     ];
-    // Pictogram offsets (in screen px) to avoid covering coast
+    // Pictogram offsets (in screen px) relative to the pair's geo anchor:
+    // AVE stacked above, Airport below, with enough vertical gap for labels.
     const offsets: [number, number][] = [
-      [-110, -40],
-      [-110, 50],
-      [-110, -40],
-      [-110, 50],
+      [-180, -95],
+      [-180, 95],
+      [-180, -95],
+      [-180, 95],
     ];
     items.forEach((it, i) => {
       const tt = t - T.picto_start - it.delay;
