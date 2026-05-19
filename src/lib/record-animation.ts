@@ -490,8 +490,10 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         const fs = Math.round(H * 0.022);
         ctx.font = `400 ${fs}px "Cormorant Garamond", Georgia, serif`;
         ctx.textBaseline = "middle";
-        ctx.textAlign = "left";
-        ctx.fillText(city.name, pt[0] + 14, pt[1]);
+        // Place labels INLAND (to the left of the dot) so they don't cross
+        // the blue Costa Brava coastline on the right.
+        ctx.textAlign = "right";
+        ctx.fillText(city.name, pt[0] - 14, pt[1]);
       }
       ctx.restore();
     });
