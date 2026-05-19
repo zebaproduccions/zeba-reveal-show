@@ -346,6 +346,23 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     path(f);
     ctx.fill();
   }
+
+  // At high zoom, redraw the world countries (skipping Spain) ON TOP of
+  // Catalonia. This covers any Catalonia overflow north of the France border
+  // (the two datasets have different coastline resolutions and don't align
+  // perfectly along the Pyrenees).
+  if (scaleNow >= 800) {
+    ctx.save();
+    ctx.fillStyle = LAND;
+    for (const f of geoCache.worldCountries.features) {
+      if ((f.properties as { name?: string })?.name === "Spain") continue;
+      ctx.beginPath();
+      path(f);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   if (strokeCatalonia) {
     ctx.strokeStyle = OUTLINE;
     ctx.lineWidth = 0.6;
