@@ -308,17 +308,28 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     if (strokeWorld) ctx.stroke();
   }
 
-  // ---- Spain provinces (subtle, only at mid zoom) ----
-  if (strokeSpain) {
-    const alpha = clamp((scaleNow - 800) / 600);
+  // ---- Spain provinces: fill (so Catalonia sits on the SAME geo source and
+  // edges align), and only stroke at mid zoom. Without this we used to see a
+  // light-brown sliver from world-atlas Spain peeking beyond Catalonia's
+  // higher-resolution boundary.
+  if (scaleNow >= 800) {
     ctx.save();
-    ctx.globalAlpha *= alpha * 0.6;
-    ctx.strokeStyle = OUTLINE_FAINT;
-    ctx.lineWidth = 0.5;
+    ctx.fillStyle = LAND;
     for (const f of geoCache.spainProvinces.features) {
       ctx.beginPath();
       path(f);
-      ctx.stroke();
+      ctx.fill();
+    }
+    if (strokeSpain) {
+      const alpha = clamp((scaleNow - 800) / 600);
+      ctx.globalAlpha *= alpha * 0.6;
+      ctx.strokeStyle = OUTLINE_FAINT;
+      ctx.lineWidth = 0.5;
+      for (const f of geoCache.spainProvinces.features) {
+        ctx.beginPath();
+        path(f);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -375,8 +386,8 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
 
   // ---- Pyrenees mountain icons removed ----
 
-  // ---- Costa Brava coast trace ----
-  if (t >= T.coast_start && t < T.zoom2to3_start + 400) {
+  // ---- Costa Brava coast trace (stays visible through the final scene) ----
+  if (t >= T.coast_start) {
     const prog = clamp((t - T.coast_start) / (T.coast_end - T.coast_start));
     const pts = geoCache.costaBravaCoast.map((p) => proj(p)).filter(Boolean) as [number, number][];
     // Compute lengths
@@ -390,7 +401,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     const target = total * easeOut(prog);
     ctx.save();
     ctx.strokeStyle = BLUE;
-    ctx.lineWidth = Math.max(1, scaleNow * 0.0009);
+    ctx.lineWidth = Math.max(0.8, Math.min(scaleNow * 0.0004, H * 0.0022));
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
