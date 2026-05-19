@@ -386,8 +386,8 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
 
   // ---- Pyrenees mountain icons removed ----
 
-  // ---- Costa Brava coast trace ----
-  if (t >= T.coast_start && t < T.zoom2to3_start + 400) {
+  // ---- Costa Brava coast trace (stays visible through the final scene) ----
+  if (t >= T.coast_start) {
     const prog = clamp((t - T.coast_start) / (T.coast_end - T.coast_start));
     const pts = geoCache.costaBravaCoast.map((p) => proj(p)).filter(Boolean) as [number, number][];
     // Compute lengths
