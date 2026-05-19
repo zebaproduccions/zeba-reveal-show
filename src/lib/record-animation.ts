@@ -339,6 +339,25 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     ctx.restore();
   }
 
+  // Fill tiny mismatches between the coarse France/world layer and the more
+  // precise Catalonia province layer. Draw this UNDER Catalonia so it closes
+  // light gaps without cutting away the dark Catalonia fill.
+  if (scaleNow >= 800) {
+    ctx.save();
+    ctx.fillStyle = LAND;
+    ctx.strokeStyle = LAND;
+    ctx.lineWidth = Math.max(2, scaleNow * 0.004);
+    ctx.lineJoin = "round";
+    for (const f of geoCache.worldCountries.features) {
+      if ((f.properties as { name?: string })?.name === "Spain") continue;
+      ctx.beginPath();
+      path(f);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // ---- Catalonia highlight (fill always; stroke only when close) ----
   ctx.fillStyle = LAND_DARK;
   for (const f of geoCache.cataloniaProvinces) {
