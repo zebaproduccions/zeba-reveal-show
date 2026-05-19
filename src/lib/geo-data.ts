@@ -13,9 +13,10 @@ export type Geo = {
 
 // Costa Brava endpoints (Blanes → Cap de Creus). The actual polyline is
 // extracted from the Girona province boundary at runtime so it follows the
-// real coastline.
+// real coastline. To change where the line starts/ends, edit the lon/lat
+// pairs below: [longitude, latitude] in decimal degrees (E positive, N positive).
 const COSTA_BRAVA_START: [number, number] = [2.79, 41.67]; // Blanes
-const COSTA_BRAVA_END: [number, number] = [3.319, 42.323]; // Cap de Creus
+const COSTA_BRAVA_END: [number, number] = [3.3175, 42.3225]; // Cap de Creus (tip)
 
 function dist2(a: [number, number], b: [number, number]) {
   const dx = a[0] - b[0];
