@@ -348,17 +348,22 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
   }
 
   // At high zoom, redraw the world countries (skipping Spain) ON TOP of
-  // Catalonia. This covers any Catalonia overflow north of the France border
-  // (the two datasets have different coastline resolutions and don't align
-  // perfectly along the Pyrenees).
+  // Catalonia. This covers any Catalonia overflow north of the France border.
+  // Additionally STROKE with LAND to expand the France polygon outward by a
+  // few px — this closes the white seam between Catalonia (dark) and France
+  // (light) caused by the two datasets having different boundary resolutions.
   if (scaleNow >= 800) {
     ctx.save();
     ctx.fillStyle = LAND;
+    ctx.strokeStyle = LAND;
+    ctx.lineWidth = Math.max(2, scaleNow * 0.004);
+    ctx.lineJoin = "round";
     for (const f of geoCache.worldCountries.features) {
       if ((f.properties as { name?: string })?.name === "Spain") continue;
       ctx.beginPath();
       path(f);
       ctx.fill();
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -490,10 +495,17 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         const fs = Math.round(H * 0.022);
         ctx.font = `400 ${fs}px "Cormorant Garamond", Georgia, serif`;
         ctx.textBaseline = "middle";
-        // Place labels INLAND (to the left of the dot) so they don't cross
-        // the blue Costa Brava coastline on the right.
-        ctx.textAlign = "right";
-        ctx.fillText(city.name, pt[0] - 14, pt[1]);
+        // Place labels at SEA (to the right of the dot, beyond the blue
+        // coastline). Exception: Roses sits at the top corner where there is
+        // no sea room to the right — keep it inland (to the left).
+        const isRoses = city.name === "Roses";
+        if (isRoses) {
+          ctx.textAlign = "right";
+          ctx.fillText(city.name, pt[0] - 14, pt[1]);
+        } else {
+          ctx.textAlign = "left";
+          ctx.fillText(city.name, pt[0] + 14, pt[1]);
+        }
       }
       ctx.restore();
     });
