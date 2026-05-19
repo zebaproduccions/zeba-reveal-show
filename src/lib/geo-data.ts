@@ -16,7 +16,7 @@ export type Geo = {
 // real coastline. To change where the line starts/ends, edit the lon/lat
 // pairs below: [longitude, latitude] in decimal degrees (E positive, N positive).
 const COSTA_BRAVA_START: [number, number] = [2.79, 41.67]; // Blanes
-const COSTA_BRAVA_END: [number, number] = [3.3175, 42.3225]; // Cap de Creus (tip)
+const COSTA_BRAVA_END: [number, number] = [3.171, 42.432]; // Portbou (NE corner with France)
 
 function dist2(a: [number, number], b: [number, number]) {
   const dx = a[0] - b[0];
