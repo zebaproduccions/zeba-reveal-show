@@ -347,27 +347,6 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     ctx.fill();
   }
 
-  // At high zoom, redraw the world countries (skipping Spain) ON TOP of
-  // Catalonia. This covers any Catalonia overflow north of the France border.
-  // Additionally STROKE with LAND to expand the France polygon outward by a
-  // few px — this closes the white seam between Catalonia (dark) and France
-  // (light) caused by the two datasets having different boundary resolutions.
-  if (scaleNow >= 800) {
-    ctx.save();
-    ctx.fillStyle = LAND;
-    ctx.strokeStyle = LAND;
-    ctx.lineWidth = Math.max(2, scaleNow * 0.004);
-    ctx.lineJoin = "round";
-    for (const f of geoCache.worldCountries.features) {
-      if ((f.properties as { name?: string })?.name === "Spain") continue;
-      ctx.beginPath();
-      path(f);
-      ctx.fill();
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   if (strokeCatalonia) {
     ctx.strokeStyle = OUTLINE;
     ctx.lineWidth = 0.6;
@@ -499,12 +478,13 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         // coastline). Exception: Roses sits at the top corner where there is
         // no sea room to the right — keep it inland (to the left).
         const isRoses = city.name === "Roses";
+        const labelDy = city.name === "L'Escala" ? -12 : city.name === "Lloret de Mar" ? 14 : 0;
         if (isRoses) {
           ctx.textAlign = "right";
-          ctx.fillText(city.name, pt[0] - 14, pt[1]);
+          ctx.fillText(city.name, pt[0] - 14, pt[1] + labelDy);
         } else {
           ctx.textAlign = "left";
-          ctx.fillText(city.name, pt[0] + 14, pt[1]);
+          ctx.fillText(city.name, pt[0] + 14, pt[1] + labelDy);
         }
       }
       ctx.restore();
