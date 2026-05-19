@@ -68,7 +68,15 @@ function extractCostaBrava(gironaFeature: Feature): [number, number][] {
     for (let i = 1; i < pts.length; i++) s += Math.sqrt(dist2(pts[i], pts[i - 1]));
     return s;
   };
-  return pathLen(forward) < pathLen(backward) ? forward : backward;
+  const chosen = pathLen(forward) < pathLen(backward) ? forward : backward;
+  // Snap the first and last vertices to the exact requested endpoints so the
+  // line always reaches the configured start/end (the ring's closest vertex
+  // may be slightly off, especially at Cap de Creus).
+  if (chosen.length > 0) {
+    chosen[0] = COSTA_BRAVA_START;
+    chosen[chosen.length - 1] = COSTA_BRAVA_END;
+  }
+  return chosen;
 }
 
 let cache: Promise<Geo> | null = null;
