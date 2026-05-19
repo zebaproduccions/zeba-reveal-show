@@ -308,17 +308,28 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     if (strokeWorld) ctx.stroke();
   }
 
-  // ---- Spain provinces (subtle, only at mid zoom) ----
-  if (strokeSpain) {
-    const alpha = clamp((scaleNow - 800) / 600);
+  // ---- Spain provinces: fill (so Catalonia sits on the SAME geo source and
+  // edges align), and only stroke at mid zoom. Without this we used to see a
+  // light-brown sliver from world-atlas Spain peeking beyond Catalonia's
+  // higher-resolution boundary.
+  if (scaleNow >= 800) {
     ctx.save();
-    ctx.globalAlpha *= alpha * 0.6;
-    ctx.strokeStyle = OUTLINE_FAINT;
-    ctx.lineWidth = 0.5;
+    ctx.fillStyle = LAND;
     for (const f of geoCache.spainProvinces.features) {
       ctx.beginPath();
       path(f);
-      ctx.stroke();
+      ctx.fill();
+    }
+    if (strokeSpain) {
+      const alpha = clamp((scaleNow - 800) / 600);
+      ctx.globalAlpha *= alpha * 0.6;
+      ctx.strokeStyle = OUTLINE_FAINT;
+      ctx.lineWidth = 0.5;
+      for (const f of geoCache.spainProvinces.features) {
+        ctx.beginPath();
+        path(f);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
