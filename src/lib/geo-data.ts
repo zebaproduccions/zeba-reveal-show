@@ -121,25 +121,23 @@ export function loadGeo(): Promise<Geo> {
         { name: "Begur", lonLat: [3.21, 41.954] },
         { name: "Lloret de Mar", lonLat: [2.847, 41.7] },
       ],
+      // Each pictogram has its own center — coordinates chosen by the user
+      // by marking the desired centre directly on a frame of the final scene.
       airports: [
         {
           id: "gro",
           name: "Girona–Costa Brava Airport",
-          // Anchor for the Girona AVE + Airport pictogram pair. Placed in
-          // central Girona province so the icons sit on land, away from
-          // the coastline labels.
-          lonLat: [2.86, 41.83],
+          lonLat: [2.79, 41.88],
         },
         {
           id: "bcn",
           name: "Barcelona–El Prat Airport",
-          // Anchor for the Barcelona AVE + Airport pair: Barcelona city.
-          lonLat: [2.17, 41.39],
+          lonLat: [2.12, 41.39],
         },
       ],
       aves: [
-        { id: "ave-gi", name: "Girona AVE", sub: "Girona", lonLat: [2.86, 41.83] },
-        { id: "ave-bcn", name: "Barcelona AVE", sub: "Barcelona", lonLat: [2.17, 41.39] },
+        { id: "ave-gi", name: "Girona AVE", sub: "Girona", lonLat: [2.84, 41.93] },
+        { id: "ave-bcn", name: "Barcelona AVE", sub: "Barcelona", lonLat: [2.18, 41.46] },
       ],
     };
   })();
