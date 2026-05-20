@@ -541,56 +541,61 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
 
   // ---- Scene 3 pictograms (airports + AVE) ----
   if (t >= T.picto_start) {
+    const r = H * 0.032;
+    // Symmetric layout per city pair: AVE on the LEFT of the city anchor,
+    // Airport on the RIGHT. Labels mirror the icon side (train label runs
+    // to the left, plane label to the right) so pictograms never overlap
+    // and the composition stays balanced.
+    const gap = r * 1.6;
     const items: {
-      lonLat: [number, number];
+      anchor: [number, number];
       icon: "plane" | "train";
       title: string;
       sub?: string;
       delay: number;
+      side: "left" | "right";
     }[] = [
-      // Pair each AVE with its airport on the SAME geo anchor so the two
-      // pictograms render perfectly stacked side-by-side (vertically), no
-      // overlap regardless of zoom.
-      { lonLat: geoCache.airports[0].lonLat, icon: "train", title: "Girona AVE", sub: "Girona", delay: 0 },
       {
-        lonLat: geoCache.airports[0].lonLat,
+        anchor: geoCache.aves[0].lonLat,
+        icon: "train",
+        title: "Girona AVE",
+        sub: "Girona",
+        delay: 0,
+        side: "left",
+      },
+      {
+        anchor: geoCache.airports[0].lonLat,
         icon: "plane",
         title: "Girona–Costa Brava",
         sub: "Airport",
         delay: 250,
+        side: "right",
       },
       {
-        lonLat: geoCache.airports[1].lonLat,
+        anchor: geoCache.aves[1].lonLat,
         icon: "train",
         title: "Barcelona AVE",
         sub: "Barcelona",
         delay: 500,
+        side: "left",
       },
       {
-        lonLat: geoCache.airports[1].lonLat,
+        anchor: geoCache.airports[1].lonLat,
         icon: "plane",
         title: "Barcelona–El Prat",
         sub: "Airport",
         delay: 750,
+        side: "right",
       },
     ];
-    // Pictogram offsets (in screen px) relative to the pair's geo anchor:
-    // AVE stacked above, Airport below, centered horizontally on the anchor
-    // so the icons sit exactly on the marked spot.
-    const offsets: [number, number][] = [
-      [0, -90],
-      [0, 90],
-      [0, -90],
-      [0, 90],
-    ];
-    items.forEach((it, i) => {
+    items.forEach((it) => {
       const tt = t - T.picto_start - it.delay;
       if (tt < 0) return;
       const a = clamp(tt / 500);
-      const cityPt = proj(it.lonLat);
-      if (!cityPt) return;
-      const [cx, cy] = [cityPt[0] + offsets[i][0], cityPt[1] + offsets[i][1]];
-      const r = H * 0.032;
+      const anchorPt = proj(it.anchor);
+      if (!anchorPt) return;
+      const dx = it.side === "left" ? -gap : gap;
+      const [cx, cy] = [anchorPt[0] + dx, anchorPt[1]];
       drawPicto(ctx, cx, cy, r * easeOutExpo(a), it.icon, a);
       // Labels appear with second wave
       const lt = t - T.labels_start - 400 - it.delay;
@@ -602,12 +607,14 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         const fs = Math.round(H * 0.024);
         ctx.font = `500 ${fs}px "Cormorant Garamond", Georgia, serif`;
         ctx.textBaseline = "middle";
-        ctx.textAlign = "left";
-        ctx.fillText(it.title, cx + r + 12, cy - fs * 0.55);
+        const labelOnLeft = it.side === "left";
+        ctx.textAlign = labelOnLeft ? "right" : "left";
+        const tx = labelOnLeft ? cx - r - 12 : cx + r + 12;
+        ctx.fillText(it.title, tx, cy - fs * 0.55);
         if (it.sub) {
           ctx.fillStyle = "#000000";
           ctx.font = `400 ${fs}px "Cormorant Garamond", Georgia, serif`;
-          ctx.fillText(it.sub, cx + r + 12, cy + fs * 0.55);
+          ctx.fillText(it.sub, tx, cy + fs * 0.55);
         }
         ctx.restore();
       }
