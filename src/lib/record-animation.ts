@@ -301,22 +301,19 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
   ctx.fillStyle = LAND;
   ctx.strokeStyle = OUTLINE_FAINT;
   ctx.lineWidth = 0.5;
-  // At higher zoom, skip the world-atlas Spain polygon — its coastline is at
-  // a coarser resolution than spainProvinces and shows as a light-brown sliver
-  // along the coast. The spainProvinces layer below fills Spain consistently.
-  const skipSpainWorld = scaleNow >= 800;
+  // Draw every world country (including Spain) so the Spain↔France border
+  // shares the same dataset and there are no cream-coloured hairline gaps
+  // along the Pyrenees. spainProvinces is drawn on top in the same LAND
+  // colour, so any minor mismatch on the coast is invisible.
   for (const f of geoCache.worldCountries.features) {
-    if (skipSpainWorld && (f.properties as { name?: string })?.name === "Spain") continue;
     ctx.beginPath();
     path(f);
     ctx.fill();
     if (strokeWorld) ctx.stroke();
   }
 
-  // ---- Spain provinces: fill (so Catalonia sits on the SAME geo source and
-  // edges align), and only stroke at mid zoom. Without this we used to see a
-  // light-brown sliver from world-atlas Spain peeking beyond Catalonia's
-  // higher-resolution boundary.
+  // ---- Spain provinces: fill in LAND on top of world-atlas Spain so
+  // higher-resolution province edges align with Catalonia below.
   if (scaleNow >= 800) {
     ctx.save();
     ctx.fillStyle = LAND;
