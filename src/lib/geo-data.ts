@@ -120,23 +120,26 @@ export function loadGeo(): Promise<Geo> {
         { name: "L'Escala", lonLat: [3.131, 42.121] },
         { name: "Begur", lonLat: [3.21, 41.954] },
         { name: "Lloret de Mar", lonLat: [2.847, 41.7] },
-        { name: "Barcelona", lonLat: [2.173, 41.385] },
       ],
       airports: [
         {
           id: "gro",
           name: "Girona–Costa Brava Airport",
-          lonLat: [2.76, 41.9],
+          // Anchor for the Girona AVE + Airport pictogram pair. Placed in
+          // central Girona province so the icons sit on land, away from
+          // the coastline labels.
+          lonLat: [2.86, 41.83],
         },
         {
           id: "bcn",
           name: "Barcelona–El Prat Airport",
-          lonLat: [2.08, 41.3],
+          // Anchor for the Barcelona AVE + Airport pair: Barcelona city.
+          lonLat: [2.17, 41.39],
         },
       ],
       aves: [
-        { id: "ave-gi", name: "Girona AVE", sub: "Girona", lonLat: [2.83, 41.98] },
-        { id: "ave-bcn", name: "Barcelona AVE", sub: "Barcelona", lonLat: [2.14, 41.38] },
+        { id: "ave-gi", name: "Girona AVE", sub: "Girona", lonLat: [2.86, 41.83] },
+        { id: "ave-bcn", name: "Barcelona AVE", sub: "Barcelona", lonLat: [2.17, 41.39] },
       ],
     };
   })();
