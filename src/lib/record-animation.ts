@@ -339,6 +339,24 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     ctx.restore();
   }
 
+  // ---- Fill gaps north of the Pyrenees (between Catalonia's high-res border
+  // and France's coarser world-atlas polygon) with LAND. Fill only — no stroke
+  // — to avoid rounded/extended borders.
+  if (scaleNow >= 800) {
+    ctx.save();
+    ctx.fillStyle = LAND;
+    for (const f of geoCache.worldCountries.features) {
+      const name = (f.properties as { name?: string })?.name;
+      if (name === "Spain") continue;
+      ctx.beginPath();
+      path(f);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+
+
 
   // ---- Catalonia highlight (fill always; stroke only when close) ----
   ctx.fillStyle = LAND_DARK;
