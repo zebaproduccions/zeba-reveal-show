@@ -222,7 +222,8 @@ function drawPicto(
   if (icon === "plane") {
     const s = r * 0.62;
     ctx.translate(cx, cy);
-    ctx.rotate(-Math.PI / 6);
+    // Nose points upper-right (taking off, climbing).
+    ctx.rotate((5 * Math.PI) / 6);
     ctx.beginPath();
     ctx.moveTo(-s * 1.05, 0);
     ctx.lineTo(s * 0.05, -s * 0.18);
@@ -487,11 +488,11 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       ctx.globalAlpha = easeOutExpo(la);
       ctx.fillStyle = INK;
       const fs = Math.round(H * 0.05);
-      ctx.font = `400 ${fs}px "Cormorant Garamond", "Cormorant", Georgia, serif`;
+      // Geometric sans (Gentona-like): DM Sans / Manrope as web-safe fallbacks.
+      ctx.font = `600 ${fs}px "DM Sans", "Manrope", "Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif`;
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
-      ctx.fillText("Costa", anchor[0], anchor[1] - fs * 0.55);
-      ctx.fillText("Brava", anchor[0], anchor[1] + fs * 0.55);
+      ctx.fillText("Costa Brava", anchor[0], anchor[1]);
       ctx.restore();
     }
   }
