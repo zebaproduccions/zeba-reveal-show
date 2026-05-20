@@ -542,11 +542,9 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
   // ---- Scene 3 pictograms (airports + AVE) ----
   if (t >= T.picto_start) {
     const r = H * 0.032;
-    // Symmetric layout per city pair: AVE on the LEFT of the city anchor,
-    // Airport on the RIGHT. Labels mirror the icon side (train label runs
-    // to the left, plane label to the right) so pictograms never overlap
-    // and the composition stays balanced.
-    const gap = r * 1.6;
+    // Each pictogram is placed exactly at its own geographic anchor — the
+    // anchors themselves were positioned to avoid overlap. The `side` field
+    // only controls which side of the icon the text label is drawn on.
     const items: {
       anchor: [number, number];
       icon: "plane" | "train";
@@ -594,8 +592,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       const a = clamp(tt / 500);
       const anchorPt = proj(it.anchor);
       if (!anchorPt) return;
-      const dx = it.side === "left" ? -gap : gap;
-      const [cx, cy] = [anchorPt[0] + dx, anchorPt[1]];
+      const [cx, cy] = [anchorPt[0], anchorPt[1]];
       drawPicto(ctx, cx, cy, r * easeOutExpo(a), it.icon, a);
       // Labels appear with second wave
       const lt = t - T.labels_start - 400 - it.delay;
