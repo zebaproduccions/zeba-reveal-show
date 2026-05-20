@@ -353,37 +353,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       ctx.fill();
     }
     ctx.restore();
-
-    // Trim France's bottom-right corner so it ends exactly at Portbou
-    // (the end of the Costa Brava blue line). The coarse world-atlas polygon
-    // extends slightly further east/south into the Mediterranean.
-    const portbou = proj([3.171, 42.432]);
-    if (portbou) {
-      ctx.save();
-      ctx.fillStyle = CREAM;
-      // Mask the quadrant to the east AND south of Portbou.
-      ctx.fillRect(portbou[0], portbou[1], W - portbou[0], H - portbou[1]);
-      ctx.restore();
-    }
-
-    // Paint the white slivers between Catalonia's northern border and the
-    // French polygon with LAND_DARK. We draw a thick LAND_DARK stroke along
-    // the Catalonia outline BEFORE the Catalonia fill below — the outward
-    // part of the stroke bridges the gap; the inward part is covered by
-    // Catalonia's own LAND_DARK fill, so the Catalan map itself is unchanged.
-    ctx.save();
-    ctx.strokeStyle = LAND_DARK;
-    ctx.lineWidth = Math.max(6, scaleNow * 0.012);
-    ctx.lineJoin = "miter";
-    ctx.lineCap = "butt";
-    for (const f of geoCache.cataloniaProvinces) {
-      ctx.beginPath();
-      path(f);
-      ctx.stroke();
-    }
-    ctx.restore();
   }
-
 
 
 
