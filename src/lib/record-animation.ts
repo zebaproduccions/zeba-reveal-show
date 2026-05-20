@@ -340,16 +340,12 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
   }
 
 
-  // ---- Catalonia highlight (fill always; stroke only when close) ----
+  // ---- Catalonia highlight (fill only; no stroke to avoid province seams) ----
   ctx.fillStyle = LAND_DARK;
-  ctx.strokeStyle = LAND_DARK;
-  ctx.lineWidth = scaleNow >= 800 ? 2.5 : 0.5;
-  ctx.lineJoin = "round";
   for (const f of geoCache.cataloniaProvinces) {
     ctx.beginPath();
     path(f);
     ctx.fill();
-    ctx.stroke();
   }
 
   if (strokeCatalonia) {
