@@ -343,6 +343,25 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     if (strokeWorld) ctx.stroke();
   }
 
+  // ---- Sea mask: re-paint the sea over any world-atlas land that bleeds
+  // past the real coastline. Use the same paper gradient as the background
+  // so the mask is invisible against the sea. spainProvinces is drawn on
+  // top afterwards, restoring any real Spanish land covered by the mask.
+  if (scaleNow >= 400) {
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < SEA_MASK.length; i++) {
+      const p = proj(SEA_MASK[i]);
+      if (!p) continue;
+      if (i === 0) ctx.moveTo(p[0], p[1]);
+      else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+  }
+
   // ---- Spain provinces: fill in LAND on top of world-atlas Spain so
   // higher-resolution province edges align with Catalonia below.
   if (scaleNow >= 800) {
