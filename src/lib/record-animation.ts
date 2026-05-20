@@ -222,7 +222,8 @@ function drawPicto(
   if (icon === "plane") {
     const s = r * 0.62;
     ctx.translate(cx, cy);
-    ctx.rotate(-Math.PI / 6);
+    // Nose points upper-right (taking off, climbing).
+    ctx.rotate((5 * Math.PI) / 6);
     ctx.beginPath();
     ctx.moveTo(-s * 1.05, 0);
     ctx.lineTo(s * 0.05, -s * 0.18);
@@ -487,11 +488,11 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       ctx.globalAlpha = easeOutExpo(la);
       ctx.fillStyle = INK;
       const fs = Math.round(H * 0.05);
-      ctx.font = `400 ${fs}px "Cormorant Garamond", "Cormorant", Georgia, serif`;
+      // Geometric sans (Gentona-like): DM Sans / Manrope as web-safe fallbacks.
+      ctx.font = `600 ${fs}px "DM Sans", "Manrope", "Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif`;
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
-      ctx.fillText("Costa", anchor[0], anchor[1] - fs * 0.55);
-      ctx.fillText("Brava", anchor[0], anchor[1] + fs * 0.55);
+      ctx.fillText("Costa Brava", anchor[0], anchor[1]);
       ctx.restore();
     }
   }
@@ -559,14 +560,15 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
           icon: "train",
           title: "Girona AVE",
           delay: 0,
-          side: "left",
+          side: "right",
         },
         {
           anchor: geoCache.airports[0].lonLat,
           icon: "plane",
           title: "Airport Girona–Costa Brava",
           delay: 250,
-          side: "right",
+          // Girona airport: label on the opposite side from Barcelona airport.
+          side: "left",
         },
       ],
       [
@@ -586,9 +588,9 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         },
       ],
     ];
-    // Minimum centre-to-centre distance so the round picto badges never touch,
-    // plus a small breathing gap.
-    const minDist = 2 * r + r * 0.6;
+    // Minimum centre-to-centre distance so the round picto badges almost touch
+    // (very small breathing gap, but never overlap).
+    const minDist = 2 * r + r * 0.08;
     const placements: { it: Item; pos: [number, number] }[] = [];
     pairs.forEach(([a, b]) => {
       const pa = proj(a.anchor);
@@ -600,7 +602,6 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       let dy = pb[1] - pa[1];
       let d = Math.hypot(dx, dy);
       if (d < 1e-3) {
-        // Same point — fall back to a horizontal split.
         dx = 1;
         dy = 0;
         d = 1;
@@ -608,8 +609,6 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       const need = Math.max(d, minDist);
       const ux = dx / d;
       const uy = dy / d;
-      // Train always on the left side of the pair, plane on the right, so the
-      // labels (train→left, plane→right) never collide.
       const half = need / 2;
       const trainPos: [number, number] = [mx - ux * half, my - uy * half];
       const planePos: [number, number] = [mx + ux * half, my + uy * half];
@@ -636,7 +635,14 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         const labelOnLeft = it.side === "left";
         ctx.textAlign = labelOnLeft ? "right" : "left";
         const tx = labelOnLeft ? cx - r - 12 : cx + r + 12;
-        ctx.fillText(it.title, tx, cy);
+        // Airport labels render on two lines: "Airport" on top, rest below.
+        if (it.icon === "plane" && it.title.startsWith("Airport ")) {
+          const rest = it.title.slice("Airport ".length);
+          ctx.fillText("Airport", tx, cy - fs * 0.55);
+          ctx.fillText(rest, tx, cy + fs * 0.55);
+        } else {
+          ctx.fillText(it.title, tx, cy);
+        }
         ctx.restore();
       }
     });
