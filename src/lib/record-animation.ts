@@ -525,12 +525,13 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
       },
     ];
     // Pictogram offsets (in screen px) relative to the pair's geo anchor:
-    // AVE stacked above, Airport below, with enough vertical gap for labels.
+    // AVE stacked above, Airport below, centered horizontally on the anchor
+    // so the icons sit exactly on the marked spot.
     const offsets: [number, number][] = [
-      [-180, -95],
-      [-180, 95],
-      [-180, -95],
-      [-180, 95],
+      [0, -90],
+      [0, 90],
+      [0, -90],
+      [0, 90],
     ];
     items.forEach((it, i) => {
       const tt = t - T.picto_start - it.delay;
