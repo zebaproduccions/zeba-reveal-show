@@ -130,6 +130,37 @@ function getProjection(t: number, W: number, H: number): GeoProjection {
   return geoMercator().scale(scale).translate(translate);
 }
 
+// ---------- Sea mask polygon ----------
+// Covers the Mediterranean visible in the scene. Drawn AFTER world countries
+// (which use a coarse 50m dataset that bleeds into the sea past the real
+// Spanish/French coasts) and BEFORE spainProvinces (which redraws Spain land
+// on top accurately). The polygon's western boundary runs inland of the real
+// Spanish coast so any world-atlas bleed is covered; the northern boundary
+// follows the real French Mediterranean coast (Cap Cerbère → Sète → Marseille
+// → Nice → Italy) so French inland territory stays as land.
+const SEA_MASK: [number, number][] = [
+  [3.00, 42.45], // Cap Cerbère (border ES/FR on coast)
+  [3.05, 43.05],
+  [3.70, 43.45], // Sète
+  [5.40, 43.40], // Marseille
+  [7.30, 43.75], // Nice
+  [8.00, 44.00],
+  [18, 44],
+  [18, 30],
+  [-10, 30],
+  [-10, 38],
+  [-2.5, 38],
+  [-1.0, 39.5],
+  [-0.5, 40.0],
+  [0.0, 40.5],
+  [0.5, 41.0],
+  [1.0, 41.5],
+  [1.7, 41.7],
+  [2.2, 42.0],
+  [2.7, 42.3],
+  [3.00, 42.45],
+];
+
 // ---------- Decorative sea waves ----------
 const WAVE_POSITIONS: [number, number][] = [
   [5.5, 41.6], [5.0, 40.5], [4.8, 39.5], [5.5, 38.5], [4.0, 37.5],
@@ -310,6 +341,25 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
     path(f);
     ctx.fill();
     if (strokeWorld) ctx.stroke();
+  }
+
+  // ---- Sea mask: re-paint the sea over any world-atlas land that bleeds
+  // past the real coastline. Use the same paper gradient as the background
+  // so the mask is invisible against the sea. spainProvinces is drawn on
+  // top afterwards, restoring any real Spanish land covered by the mask.
+  if (scaleNow >= 400) {
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < SEA_MASK.length; i++) {
+      const p = proj(SEA_MASK[i]);
+      if (!p) continue;
+      if (i === 0) ctx.moveTo(p[0], p[1]);
+      else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
   }
 
   // ---- Spain provinces: fill in LAND on top of world-atlas Spain so
