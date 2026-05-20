@@ -542,59 +542,88 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
   // ---- Scene 3 pictograms (airports + AVE) ----
   if (t >= T.picto_start) {
     const r = H * 0.032;
-    // Each pictogram is placed exactly at its own geographic anchor — the
-    // anchors themselves were positioned to avoid overlap. The `side` field
-    // only controls which side of the icon the text label is drawn on.
-    const items: {
+    // Group icons by city. Anchors are the user-chosen centres; we then push
+    // the two icons of a pair apart along the line that joins them so they
+    // never touch, keeping the pair centred on the midpoint of the originals.
+    type Item = {
       anchor: [number, number];
       icon: "plane" | "train";
       title: string;
-      sub?: string;
       delay: number;
-      side: "left" | "right";
-    }[] = [
-      {
-        anchor: geoCache.aves[0].lonLat,
-        icon: "train",
-        title: "Girona AVE",
-        sub: "Girona",
-        delay: 0,
-        side: "left",
-      },
-      {
-        anchor: geoCache.airports[0].lonLat,
-        icon: "plane",
-        title: "Girona–Costa Brava",
-        sub: "Airport",
-        delay: 250,
-        side: "right",
-      },
-      {
-        anchor: geoCache.aves[1].lonLat,
-        icon: "train",
-        title: "Barcelona AVE",
-        sub: "Barcelona",
-        delay: 500,
-        side: "left",
-      },
-      {
-        anchor: geoCache.airports[1].lonLat,
-        icon: "plane",
-        title: "Barcelona–El Prat",
-        sub: "Airport",
-        delay: 750,
-        side: "right",
-      },
+      side: "left" | "right"; // label side
+    };
+    const pairs: [Item, Item][] = [
+      [
+        {
+          anchor: geoCache.aves[0].lonLat,
+          icon: "train",
+          title: "Girona AVE",
+          delay: 0,
+          side: "left",
+        },
+        {
+          anchor: geoCache.airports[0].lonLat,
+          icon: "plane",
+          title: "Airport Girona–Costa Brava",
+          delay: 250,
+          side: "right",
+        },
+      ],
+      [
+        {
+          anchor: geoCache.aves[1].lonLat,
+          icon: "train",
+          title: "Barcelona AVE",
+          delay: 500,
+          side: "left",
+        },
+        {
+          anchor: geoCache.airports[1].lonLat,
+          icon: "plane",
+          title: "Airport Barcelona–El Prat",
+          delay: 750,
+          side: "right",
+        },
+      ],
     ];
-    items.forEach((it) => {
+    // Minimum centre-to-centre distance so the round picto badges never touch,
+    // plus a small breathing gap.
+    const minDist = 2 * r + r * 0.6;
+    const placements: { it: Item; pos: [number, number] }[] = [];
+    pairs.forEach(([a, b]) => {
+      const pa = proj(a.anchor);
+      const pb = proj(b.anchor);
+      if (!pa || !pb) return;
+      const mx = (pa[0] + pb[0]) / 2;
+      const my = (pa[1] + pb[1]) / 2;
+      let dx = pb[0] - pa[0];
+      let dy = pb[1] - pa[1];
+      let d = Math.hypot(dx, dy);
+      if (d < 1e-3) {
+        // Same point — fall back to a horizontal split.
+        dx = 1;
+        dy = 0;
+        d = 1;
+      }
+      const need = Math.max(d, minDist);
+      const ux = dx / d;
+      const uy = dy / d;
+      // Train always on the left side of the pair, plane on the right, so the
+      // labels (train→left, plane→right) never collide.
+      const half = need / 2;
+      const trainPos: [number, number] = [mx - ux * half, my - uy * half];
+      const planePos: [number, number] = [mx + ux * half, my + uy * half];
+      const trainItem = a.icon === "train" ? a : b;
+      const planeItem = a.icon === "plane" ? a : b;
+      placements.push({ it: trainItem, pos: trainPos });
+      placements.push({ it: planeItem, pos: planePos });
+    });
+    placements.forEach(({ it, pos }) => {
       const tt = t - T.picto_start - it.delay;
       if (tt < 0) return;
       const a = clamp(tt / 500);
-      const anchorPt = proj(it.anchor);
-      if (!anchorPt) return;
-      const [cx, cy] = [anchorPt[0], anchorPt[1]];
+      const [cx, cy] = pos;
       drawPicto(ctx, cx, cy, r * easeOutExpo(a), it.icon, a);
-      // Labels appear with second wave
       const lt = t - T.labels_start - 400 - it.delay;
       if (lt > 0) {
         const la = clamp(lt / 500);
@@ -607,12 +636,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
         const labelOnLeft = it.side === "left";
         ctx.textAlign = labelOnLeft ? "right" : "left";
         const tx = labelOnLeft ? cx - r - 12 : cx + r + 12;
-        ctx.fillText(it.title, tx, cy - fs * 0.55);
-        if (it.sub) {
-          ctx.fillStyle = "#000000";
-          ctx.font = `400 ${fs}px "Cormorant Garamond", Georgia, serif`;
-          ctx.fillText(it.sub, tx, cy + fs * 0.55);
-        }
+        ctx.fillText(it.title, tx, cy);
         ctx.restore();
       }
     });
