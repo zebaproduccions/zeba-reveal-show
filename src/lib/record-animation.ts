@@ -139,8 +139,10 @@ function getProjection(t: number, W: number, H: number): GeoProjection {
 // follows the real French Mediterranean coast (Cap Cerbère → Sète → Marseille
 // → Nice → Italy) so French inland territory stays as land.
 const SEA_MASK: [number, number][] = [
-  [3.00, 42.45], // Cap Cerbère (border ES/FR on coast)
-  [3.05, 43.05],
+  [3.21, 42.44], // Just east of Portbou (ES/FR border on coast)
+  [3.25, 42.55],
+  [3.30, 42.80],
+  [3.40, 43.10],
   [3.70, 43.45], // Sète
   [5.40, 43.40], // Marseille
   [7.30, 43.75], // Nice
@@ -158,7 +160,7 @@ const SEA_MASK: [number, number][] = [
   [1.7, 41.7],
   [2.2, 42.0],
   [2.7, 42.3],
-  [3.00, 42.45],
+  [3.21, 42.44],
 ];
 
 // ---------- Decorative sea waves ----------
@@ -560,7 +562,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
           icon: "train",
           title: "Girona AVE",
           delay: 0,
-          side: "right",
+          side: "left",
         },
         {
           anchor: geoCache.airports[0].lonLat,
