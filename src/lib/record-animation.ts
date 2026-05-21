@@ -560,7 +560,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, tRaw: number, W: number
           icon: "train",
           title: "Girona AVE",
           delay: 0,
-          side: "right",
+          side: "left",
         },
         {
           anchor: geoCache.airports[0].lonLat,
