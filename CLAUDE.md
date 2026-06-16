@@ -123,3 +123,9 @@ El preview corre a `http://localhost:8080` (o el port que indiqui Vite).
 - **No modificar `src/routeTree.gen.ts`**. Es regenera automàticament.
 - **Totes les coordenades de pictogrames** (centres, colors, posició d'etiquetes) són hardcoded i han de ser modificades només si l'usuari ho demana explícitament marcant-les sobre un fotograma.
 - **La frontera amb França** (part oest del `SEA_MASK`) és molt sensible. Qualsevol canvi ha de ser verificat visualment perquè no cobreixi terra francesa ni deixi forats.
+
+## Preferència de comunicació
+
+- **Respon sempre en català.** L'usuari es comunica en català i espera respostes en català.
+- Prefereix contingut estàtic hardcoded (a fitxers de traducció o components) abans que placeholders dinàmics o mock data en runtime.
+- Respostes concises: poques línies de text, codi i tool calls no compten.
