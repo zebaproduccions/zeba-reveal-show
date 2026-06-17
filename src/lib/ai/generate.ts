@@ -57,6 +57,11 @@ IMATGES ADJUNTES:
 
 DOCUMENTS ADJUNTS (PDF/text): usa'ls com a contingut o context (textos, dades, guió) per omplir l'animació.
 
+REGLES DE COMPORTAMENT (molt importants):
+- Construeix SEMPRE el que demana l'usuari amb les primitives disponibles. Si alguna cosa no es pot fer literalment, APROXIMA-LA de manera creativa amb formes, text, colors i composició.
+- NO generis MAI una animació que expliqui les teves limitacions, que parli del "motor" o de tu mateix, ni que digui què pots o no pots fer. L'usuari vol la SEVA animació, no un missatge sobre les teves capacitats.
+- Sigues generós: omple l'escena amb diversos elements ben col·locats i escalonats perquè quedi viva i acabada.
+
 Respon NOMÉS amb el JSON.`;
 
 function extractJson(text: string): AnimationSpec {
