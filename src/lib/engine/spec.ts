@@ -1,3 +1,4 @@
+import { image } from "./layers/image";
 import { bar, circle, line } from "./layers/shape";
 import { text } from "./layers/text";
 import type { Animation, Layer } from "./types";
@@ -60,7 +61,24 @@ export type SpecLineLayer = {
   in?: number;
 };
 
-export type SpecLayer = SpecTextLayer | SpecCircleLayer | SpecBarLayer | SpecLineLayer;
+export type SpecImageLayer = {
+  kind: "image";
+  /** Index into the attached images (0-based). */
+  ref: number;
+  x: number;
+  y: number;
+  w: number;
+  h?: number;
+  start?: number;
+  in?: number;
+};
+
+export type SpecLayer =
+  | SpecTextLayer
+  | SpecCircleLayer
+  | SpecBarLayer
+  | SpecLineLayer
+  | SpecImageLayer;
 
 export type AnimationSpec = {
   title: string;
@@ -74,8 +92,21 @@ const DEFAULT_BG = "#0a1c3f";
 const num = (v: unknown, fallback: number) => (typeof v === "number" && isFinite(v) ? v : fallback);
 const str = (v: unknown, fallback: string) => (typeof v === "string" && v.length > 0 ? v : fallback);
 
-function toLayer(l: SpecLayer): Layer | null {
+function toLayer(l: SpecLayer, images: HTMLImageElement[]): Layer | null {
   switch (l.kind) {
+    case "image": {
+      const img = images[num(l.ref, 0)];
+      if (!img) return null;
+      return image({
+        img,
+        x: num(l.x, 0.5),
+        y: num(l.y, 0.5),
+        w: num(l.w, 0.3),
+        h: typeof l.h === "number" ? l.h : undefined,
+        start: num(l.start, 0),
+        in: num(l.in, 600),
+      });
+    }
     case "text":
       return text({
         text: Array.isArray(l.text) ? l.text : str(l.text, ""),
@@ -129,9 +160,13 @@ function toLayer(l: SpecLayer): Layer | null {
 }
 
 /** Build a runnable Animation from a (possibly AI-generated) spec. */
-export function fromSpec(spec: AnimationSpec, id = `ai-${Date.now()}`): Animation {
+export function fromSpec(
+  spec: AnimationSpec,
+  images: HTMLImageElement[] = [],
+  id = `ai-${Date.now()}`,
+): Animation {
   const layers = (Array.isArray(spec.layers) ? spec.layers : [])
-    .map(toLayer)
+    .map((l) => toLayer(l, images))
     .filter((l): l is Layer => l !== null);
   return {
     id,

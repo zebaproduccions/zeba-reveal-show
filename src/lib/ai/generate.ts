@@ -6,16 +6,24 @@ import type { AnimationSpec } from "@/lib/engine/spec";
 declare const process: { env: Record<string, string | undefined> };
 
 // ============================================================
-// Server function: turns a natural-language prompt into an AnimationSpec by
-// calling Claude. Runs only on the server (Cloudflare Worker), so the API key
-// never reaches the browser. The model fills a fixed JSON schema — it never
-// returns code — and the engine renders the result.
+// Server function: turns a natural-language prompt (plus optional reference
+// images and documents) into an AnimationSpec by calling Claude. Runs only on
+// the server (Cloudflare Worker), so the API key never reaches the browser.
+// The model fills a fixed JSON schema — it never returns code.
 // ============================================================
 
 const MODEL = "claude-opus-4-8";
 
+type Attachment = { media_type: string; data: string }; // base64, no data: prefix
+
+export type GenerateInput = {
+  prompt: string;
+  images?: Attachment[]; // reference images / images to insert (indexed 0..n-1)
+  docs?: Attachment[]; // PDFs used as context
+};
+
 const SYSTEM_PROMPT = `Ets un assistent que dissenya animacions per a un motor de Canvas 2D (1920×1080).
-Reps una descripció en llenguatge natural i respons NOMÉS amb un objecte JSON vàlid (sense markdown, sense text abans ni després) que descriu l'animació.
+Reps una descripció en llenguatge natural (i opcionalment imatges i documents adjunts) i respons NOMÉS amb un objecte JSON vàlid (sense markdown, sense text abans ni després) que descriu l'animació.
 
 Format del JSON:
 {
@@ -31,21 +39,28 @@ TEXT:   { "kind":"text", "text": string | string[], "x":0..1, "y":0..1, "size":0
 CIRCLE: { "kind":"circle", "x":0..1, "y":0..1, "r":0..0.3, "fill":"#hex", "stroke":"#hex", "lineWidth":0..0.02, "start":ms, "in":ms }
 BAR:    { "kind":"bar", "x":0..1, "y":0..1, "w":0..1, "h":0..0.2, "fill":"#hex", "radius":0..0.05, "start":ms, "in":ms }
 LINE:   { "kind":"line", "x1":0..1, "y1":0..1, "x2":0..1, "y2":0..1, "stroke":"#hex", "lineWidth":0..0.02, "start":ms, "in":ms }
+IMAGE:  { "kind":"image", "ref":number, "x":0..1, "y":0..1, "w":0..1, "h":0..1, "start":ms, "in":ms }
 
 Convencions IMPORTANTS:
-- Posicions x,y i x1/y1/x2/y2 són normalitzades 0..1 (0,0 = cantonada superior esquerra; 1,1 = inferior dreta).
-- Mides (size, r, h, lineWidth, rise) són FRACCIÓ DE L'ALÇADA. "size":0.1 és un text gran; un títol sol anar entre 0.08 i 0.13. Un subtítol entre 0.03 i 0.045.
-- "w" (amplada de bar) és fracció de l'AMPLADA.
-- "start" és quan la capa comença a aparèixer (ms); "in" és la durada de l'entrada (fade + pujada). Escalona els "start" perquè els elements apareguin un darrere l'altre.
-- Tots els elements es queden visibles després d'entrar (no desapareixen).
-- Tria colors que contrastin bé amb el fons. Text clar sobre fons fosc i viceversa.
-- Composició neta i centrada: títol cap al centre, subtítol a sota, formes decoratives ben col·locades.
+- Posicions x,y (i x1/y1/x2/y2) són normalitzades 0..1 (0,0 = dalt-esquerra; 1,1 = baix-dreta).
+- Mides (size, r, h de bar, lineWidth, rise) són FRACCIÓ DE L'ALÇADA. Un títol sol anar entre 0.08 i 0.13; un subtítol entre 0.03 i 0.045.
+- "w" (amplada de bar i d'image) és fracció de l'AMPLADA. Per a IMAGE, si no poses "h" es manté la proporció original de la imatge.
+- "start" és quan la capa apareix (ms); "in" és la durada de l'entrada. Escalona els "start".
+- Tots els elements es queden visibles després d'entrar.
+- Tria colors que contrastin bé amb el fons.
+
+IMATGES ADJUNTES:
+- Si hi ha imatges adjuntes, estan indexades començant per 0 en l'ordre en què apareixen.
+- Per INSERIR una imatge adjunta dins l'animació (logo, foto…), usa una capa IMAGE amb "ref" igual al seu índex.
+- Si l'usuari demana que la imatge sigui només de REFERÈNCIA d'estil (colors, tipografia, to), NO l'insereixis: limita't a imitar-ne la paleta i l'estil en les altres capes.
+- Segueix el que digui el text de l'usuari per decidir si una imatge és per inserir o per referència.
+
+DOCUMENTS ADJUNTS (PDF/text): usa'ls com a contingut o context (textos, dades, guió) per omplir l'animació.
 
 Respon NOMÉS amb el JSON.`;
 
 function extractJson(text: string): AnimationSpec {
   let t = text.trim();
-  // Strip ```json fences if the model added them.
   const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fence) t = fence[1].trim();
   const start = t.indexOf("{");
@@ -54,20 +69,56 @@ function extractJson(text: string): AnimationSpec {
   return JSON.parse(t) as AnimationSpec;
 }
 
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+  | { type: "document"; source: { type: "base64"; media_type: string; data: string } };
+
 export const generateAnimation = createServerFn({ method: "POST" })
-  .inputValidator((prompt: unknown): string => {
-    if (typeof prompt !== "string" || prompt.trim().length === 0) {
+  .inputValidator((input: unknown): GenerateInput => {
+    const obj = (input ?? {}) as Partial<GenerateInput>;
+    if (typeof obj.prompt !== "string" || obj.prompt.trim().length === 0) {
       throw new Error("Cal una descripció.");
     }
-    return prompt.trim().slice(0, 2000);
+    const clean = (arr: unknown): Attachment[] =>
+      Array.isArray(arr)
+        ? arr
+            .filter(
+              (a): a is Attachment =>
+                !!a &&
+                typeof (a as Attachment).media_type === "string" &&
+                typeof (a as Attachment).data === "string",
+            )
+            .slice(0, 6)
+        : [];
+    return {
+      prompt: obj.prompt.trim().slice(0, 2000),
+      images: clean(obj.images),
+      docs: clean(obj.docs),
+    };
   })
-  .handler(async ({ data: prompt }): Promise<AnimationSpec> => {
+  .handler(async ({ data }): Promise<AnimationSpec> => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       throw new Error(
         "Falta la clau d'API. Afegeix el secret ANTHROPIC_API_KEY a Cloudflare (Settings → Variables and Secrets).",
       );
     }
+
+    const content: ContentBlock[] = [{ type: "text", text: data.prompt }];
+    (data.images ?? []).forEach((img, i) => {
+      content.push({ type: "text", text: `Imatge adjunta índex ${i}:` });
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: img.media_type, data: img.data },
+      });
+    });
+    (data.docs ?? []).forEach((doc) => {
+      content.push({
+        type: "document",
+        source: { type: "base64", media_type: doc.media_type, data: doc.data },
+      });
+    });
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -80,7 +131,7 @@ export const generateAnimation = createServerFn({ method: "POST" })
         model: MODEL,
         max_tokens: 4000,
         system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content }],
       }),
     });
 
@@ -89,10 +140,8 @@ export const generateAnimation = createServerFn({ method: "POST" })
       throw new Error(`Error de l'API (${res.status}). ${detail.slice(0, 300)}`);
     }
 
-    const data = (await res.json()) as {
-      content?: { type: string; text?: string }[];
-    };
-    const textBlock = data.content?.find((b) => b.type === "text")?.text ?? "";
+    const json = (await res.json()) as { content?: { type: string; text?: string }[] };
+    const textBlock = json.content?.find((b) => b.type === "text")?.text ?? "";
     if (!textBlock) throw new Error("Resposta buida del model.");
 
     try {

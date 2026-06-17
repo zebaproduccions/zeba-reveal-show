@@ -11,8 +11,66 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+type Attachment = {
+  id: string;
+  type: "image" | "pdf";
+  name: string;
+  send: { media_type: string; data: string };
+  img?: HTMLImageElement; // original, for rendering into the video
+};
+
+const readDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+
+// Downscale to ~1024px JPEG to keep the payload (and token cost) small when
+// sending to the model. The full-res original is kept separately for rendering.
+async function processImage(file: File): Promise<Attachment> {
+  const dataUrl = await readDataUrl(file);
+  const img = await loadImage(dataUrl);
+  const maxDim = 1024;
+  const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+  const cw = Math.max(1, Math.round(img.naturalWidth * scale));
+  const ch = Math.max(1, Math.round(img.naturalHeight * scale));
+  const c = document.createElement("canvas");
+  c.width = cw;
+  c.height = ch;
+  c.getContext("2d")!.drawImage(img, 0, 0, cw, ch);
+  const data = c.toDataURL("image/jpeg", 0.85).split(",")[1];
+  return {
+    id: crypto.randomUUID(),
+    type: "image",
+    name: file.name,
+    send: { media_type: "image/jpeg", data },
+    img,
+  };
+}
+
+async function processPdf(file: File): Promise<Attachment> {
+  const dataUrl = await readDataUrl(file);
+  return {
+    id: crypto.randomUUID(),
+    type: "pdf",
+    name: file.name,
+    send: { media_type: "application/pdf", data: dataUrl.split(",")[1] },
+  };
+}
+
 function Index() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const [generated, setGenerated] = useState<Animation | null>(null);
   const [selectedId, setSelectedId] = useState(DEFAULT_ANIMATION.id);
   const [ready, setReady] = useState(false);
@@ -20,13 +78,13 @@ function Index() {
   const [progress, setProgress] = useState(0);
   const [replayKey, setReplayKey] = useState(0);
   const [prompt, setPrompt] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const list: Animation[] = generated ? [...ANIMATIONS, generated] : ANIMATIONS;
   const anim = list.find((a) => a.id === selectedId) ?? DEFAULT_ANIMATION;
 
-  // Load the selected animation's data whenever the selection changes.
   useEffect(() => {
     let cancelled = false;
     setReady(false);
@@ -38,7 +96,6 @@ function Index() {
     };
   }, [anim]);
 
-  // Play the selected animation on the on-screen canvas.
   useEffect(() => {
     if (!ready) return;
     const canvas = canvasRef.current;
@@ -58,6 +115,25 @@ function Index() {
     return () => cancelAnimationFrame(raf);
   }, [replayKey, ready, anim]);
 
+  const handleFiles = async (files: FileList | null) => {
+    if (!files) return;
+    setError(null);
+    const next: Attachment[] = [];
+    for (const file of Array.from(files)) {
+      try {
+        if (file.type.startsWith("image/")) next.push(await processImage(file));
+        else if (file.type === "application/pdf") next.push(await processPdf(file));
+      } catch {
+        setError(`No s'ha pogut llegir ${file.name}.`);
+      }
+    }
+    setAttachments((prev) => [...prev, ...next].slice(0, 6));
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const removeAttachment = (id: string) =>
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+
   const handleSelect = (id: string) => {
     if (recording || id === selectedId) return;
     setSelectedId(id);
@@ -69,8 +145,17 @@ function Index() {
     setGenerating(true);
     setError(null);
     try {
-      const spec = await generateAnimation({ data: prompt });
-      const a = fromSpec(spec);
+      const imageAtts = attachments.filter((a) => a.type === "image");
+      const docAtts = attachments.filter((a) => a.type === "pdf");
+      const spec = await generateAnimation({
+        data: {
+          prompt,
+          images: imageAtts.map((a) => a.send),
+          docs: docAtts.map((a) => a.send),
+        },
+      });
+      const imgEls = imageAtts.map((a) => a.img!).filter(Boolean);
+      const a = fromSpec(spec, imgEls);
       setGenerated(a);
       setSelectedId(a.id);
       setReplayKey((k) => k + 1);
@@ -100,16 +185,14 @@ function Index() {
   return (
     <main
       className="relative min-h-screen w-full bg-[#f3ecdf] flex flex-col items-center justify-center px-6 py-10"
-      style={{
-        fontFamily: '"Gentona", "Mulish", "Inter", system-ui, sans-serif',
-      }}
+      style={{ fontFamily: '"Gentona", "Mulish", "Inter", system-ui, sans-serif' }}
     >
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap"
       />
 
-      {/* Prompt box — generate a new animation by describing it */}
+      {/* Prompt box — generate a new animation by describing it (+ attachments) */}
       <div className="w-full max-w-[1280px] mb-5">
         <div className="flex flex-col sm:flex-row gap-2">
           <input
@@ -120,9 +203,24 @@ function Index() {
               if (e.key === "Enter") handleGenerate();
             }}
             disabled={generating || busy}
-            placeholder="Descriu una animació nova… ex: una intro amb el títol 'Estiu 2026' i tres cercles de colors"
+            placeholder="Descriu una animació nova… ex: una intro amb el títol 'Estiu 2026' i el logo adjunt a baix a la dreta"
             className="flex-1 text-sm px-4 py-3 rounded-xl border border-[#0a2342]/20 bg-white/70 text-[#0a2342] placeholder:text-[#0a2342]/40 outline-none focus:border-[#0a2342]/50 transition disabled:opacity-60"
           />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={generating || busy}
+            className="text-sm px-4 py-3 rounded-xl border border-[#0a2342]/20 text-[#0a2342] hover:bg-white/60 transition disabled:opacity-50 whitespace-nowrap"
+          >
+            + Adjuntar
+          </button>
           <button
             onClick={handleGenerate}
             disabled={generating || busy || prompt.trim().length === 0}
@@ -131,6 +229,29 @@ function Index() {
             {generating ? "Generant…" : "Generar amb IA"}
           </button>
         </div>
+
+        {attachments.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {attachments.map((a, i) => (
+              <span
+                key={a.id}
+                className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/70 border border-[#0a2342]/15 text-[#0a2342]"
+              >
+                {a.type === "image" ? "🖼" : "📄"} {a.name}
+                {a.type === "image" && (
+                  <span className="text-[#0a2342]/50">#{i}</span>
+                )}
+                <button
+                  onClick={() => removeAttachment(a.id)}
+                  className="text-[#0a2342]/50 hover:text-[#a3331f]"
+                  aria-label="Treure"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         {error && <p className="mt-2 text-sm text-[#a3331f]">{error}</p>}
       </div>
 
