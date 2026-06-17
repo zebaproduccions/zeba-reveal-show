@@ -55,6 +55,27 @@ IMATGES ADJUNTES:
 - Si l'usuari demana que la imatge sigui només de REFERÈNCIA d'estil (colors, tipografia, to), NO l'insereixis: limita't a imitar-ne la paleta i l'estil en les altres capes.
 - Segueix el que digui el text de l'usuari per decidir si una imatge és per inserir o per referència.
 
+MOVIMENT (clau perquè quedi VIU):
+Qualsevol capa pot portar un camp "motion" que la desplaça, gira o escala al llarg del temps:
+"motion": {
+  "loop": boolean,        // true per a moviments continus (flotar, girar, bategar)
+  "duration": ms,         // durada d'un cicle; si l'omets, dura tota l'animació
+  "x": Keyframe[],        // desplaçament horitzontal (fracció d'amplada; -0.5 = mitja pantalla cap a l'esquerra)
+  "y": Keyframe[],        // desplaçament vertical (fracció d'alçada; valors negatius = amunt)
+  "scale": Keyframe[],    // mida (1 = original, 1.2 = 20% més gran)
+  "rotate": Keyframe[]    // graus
+}
+Keyframe = { "t":0..1, "v":number, "ease":"linear"|"inOut"|"out" }   // "t" és la fracció del cicle
+
+Exemples (copia'ls i adapta'ls):
+- Flotar suau:        "motion":{"loop":true,"duration":2500,"y":[{"t":0,"v":0},{"t":0.5,"v":-0.03,"ease":"inOut"},{"t":1,"v":0,"ease":"inOut"}]}
+- Bategar:            "motion":{"loop":true,"duration":1500,"scale":[{"t":0,"v":1},{"t":0.5,"v":1.12,"ease":"inOut"},{"t":1,"v":1,"ease":"inOut"}]}
+- Girar sense parar:  "motion":{"loop":true,"duration":6000,"rotate":[{"t":0,"v":0},{"t":1,"v":360}]}
+- Entrar lliscant:    "motion":{"duration":700,"x":[{"t":0,"v":-0.5,"ease":"out"},{"t":1,"v":0}]}
+- Travessar la pantalla: "motion":{"loop":true,"duration":5000,"x":[{"t":0,"v":-0.6},{"t":1,"v":0.6}]}
+
+Fes servir el moviment GENEROSAMENT: títols que entren lliscant, elements decoratius que floten/bateguen/giren, accents que es desplacen. Combina l'entrada (start/in) amb "motion". Una bona animació gairebé sempre té diversos elements en moviment.
+
 DOCUMENTS ADJUNTS (PDF/text): usa'ls com a contingut o context (textos, dades, guió) per omplir l'animació.
 
 REGLES DE COMPORTAMENT (molt importants):

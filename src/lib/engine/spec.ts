@@ -1,6 +1,7 @@
 import { image } from "./layers/image";
 import { bar, circle, line } from "./layers/shape";
 import { text } from "./layers/text";
+import { withMotion, type Motion } from "./motion";
 import type { Animation, Layer } from "./types";
 
 // ============================================================
@@ -73,12 +74,13 @@ export type SpecImageLayer = {
   in?: number;
 };
 
-export type SpecLayer =
+export type SpecLayer = (
   | SpecTextLayer
   | SpecCircleLayer
   | SpecBarLayer
   | SpecLineLayer
-  | SpecImageLayer;
+  | SpecImageLayer
+) & { motion?: Motion };
 
 export type AnimationSpec = {
   title: string;
@@ -92,7 +94,7 @@ const DEFAULT_BG = "#0a1c3f";
 const num = (v: unknown, fallback: number) => (typeof v === "number" && isFinite(v) ? v : fallback);
 const str = (v: unknown, fallback: string) => (typeof v === "string" && v.length > 0 ? v : fallback);
 
-function toLayer(l: SpecLayer, images: HTMLImageElement[]): Layer | null {
+function baseLayer(l: SpecLayer, images: HTMLImageElement[]): Layer | null {
   switch (l.kind) {
     case "image": {
       const img = images[num(l.ref, 0)];
@@ -157,6 +159,22 @@ function toLayer(l: SpecLayer, images: HTMLImageElement[]): Layer | null {
     default:
       return null;
   }
+}
+
+// Pivot point (normalized) a layer rotates/scales around and moves from.
+function pivotOf(l: SpecLayer): [number, number] {
+  if (l.kind === "line") {
+    return [(num(l.x1, 0.3) + num(l.x2, 0.7)) / 2, (num(l.y1, 0.5) + num(l.y2, 0.5)) / 2];
+  }
+  return [num(l.x, 0.5), num(l.y, 0.5)];
+}
+
+function toLayer(l: SpecLayer, images: HTMLImageElement[]): Layer | null {
+  const base = baseLayer(l, images);
+  if (!base) return null;
+  if (!l.motion) return base;
+  const [px, py] = pivotOf(l);
+  return withMotion(base, l.motion, px, py);
 }
 
 /** Build a runnable Animation from a (possibly AI-generated) spec. */
