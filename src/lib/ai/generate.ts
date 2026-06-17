@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { AnimationSpec } from "@/lib/engine/spec";
+import type { CodeAnimationData } from "@/lib/engine/code-animation";
 
 // Cloudflare Workers expose secrets/vars on process.env when nodejs_compat is
 // enabled (see wrangler.jsonc). Declared locally to avoid pulling node types.
@@ -7,9 +7,9 @@ declare const process: { env: Record<string, string | undefined> };
 
 // ============================================================
 // Server function: turns a natural-language prompt (plus optional reference
-// images and documents) into an AnimationSpec by calling Claude. Runs only on
-// the server (Cloudflare Worker), so the API key never reaches the browser.
-// The model fills a fixed JSON schema — it never returns code.
+// images and documents) into the BODY of a Canvas draw function written by
+// Claude. Runs only on the server (Cloudflare Worker), so the API key never
+// reaches the browser. The engine executes the returned code per frame.
 // ============================================================
 
 const MODEL = "claude-opus-4-8";
@@ -18,81 +18,51 @@ type Attachment = { media_type: string; data: string }; // base64, no data: pref
 
 export type GenerateInput = {
   prompt: string;
-  images?: Attachment[]; // reference images / images to insert (indexed 0..n-1)
-  docs?: Attachment[]; // PDFs used as context
+  images?: Attachment[];
+  docs?: Attachment[];
 };
 
-const SYSTEM_PROMPT = `Ets un assistent que dissenya animacions per a un motor de Canvas 2D (1920×1080).
-Reps una descripció en llenguatge natural (i opcionalment imatges i documents adjunts) i respons NOMÉS amb un objecte JSON vàlid (sense markdown, sense text abans ni després) que descriu l'animació.
+const SYSTEM_PROMPT = `Ets un programador creatiu expert en animacions amb Canvas 2D. L'usuari et descriu una animació (i opcionalment adjunta imatges o documents) i tu generes el CODI JavaScript que la dibuixa.
 
-Format del JSON:
-{
-  "title": string,                      // títol curt de l'animació
-  "duration": number,                   // durada total en ms (entre 3000 i 12000)
-  "background": string,                 // color de fons en hex, ex "#0a1c3f"
-  "layers": SpecLayer[]                 // capes ordenades; es dibuixen totes cada frame
-}
+El teu codi és el COS d'una funció que es crida UN cop per cada frame, amb aquesta signatura:
+  (ctx, t, W, H, u) => { ...EL TEU CODI... }
 
-Cada capa és un d'aquests tipus (camp "kind"):
+Paràmetres:
+- ctx: CanvasRenderingContext2D on dibuixes.
+- t: temps transcorregut en mil·lisegons (de 0 fins a la durada).
+- W, H: amplada i alçada del canvas EN PÍXELS. IMPORTANT: fes servir SEMPRE W i H per a totes les posicions i mides (mai números fixos com 1920), perquè el mateix codi s'usa a pantalla i en gravació a doble resolució.
+- u: utilitats → u.images (array d'imatges adjuntes, HTMLImageElement, dibuixa-les amb ctx.drawImage(u.images[i], x, y, w, h)), u.lerp(a,b,p), u.clamp(n,min,max), u.ease.inOut(p), u.ease.out(p), u.ease.outExpo(p), u.TAU (=2π).
 
-TEXT:   { "kind":"text", "text": string | string[], "x":0..1, "y":0..1, "size":0..1, "color":"#hex", "weight":400..800, "align":"left"|"center"|"right", "start":ms, "in":ms, "rise":0..0.1 }
-CIRCLE: { "kind":"circle", "x":0..1, "y":0..1, "r":0..0.3, "fill":"#hex", "stroke":"#hex", "lineWidth":0..0.02, "start":ms, "in":ms }
-BAR:    { "kind":"bar", "x":0..1, "y":0..1, "w":0..1, "h":0..0.2, "fill":"#hex", "radius":0..0.05, "start":ms, "in":ms }
-LINE:   { "kind":"line", "x1":0..1, "y1":0..1, "x2":0..1, "y2":0..1, "stroke":"#hex", "lineWidth":0..0.02, "start":ms, "in":ms }
-IMAGE:  { "kind":"image", "ref":number, "x":0..1, "y":0..1, "w":0..1, "h":0..1, "start":ms, "in":ms }
+Regles del codi:
+- Pinta el FONS cada frame primer de tot (ctx.fillStyle=...; ctx.fillRect(0,0,W,H)).
+- Anima en funció de t: entrades amb fade/escala, moviments continus amb Math.sin/cos, bucles, partícules, traçats… el que calgui perquè sigui VIU i professional.
+- Pots usar tot el que ofereix Canvas 2D: gradients, ombres, paths, clip, globalAlpha, transformacions, text, etc.
+- Tipografia: fonts geomètriques sans com '"DM Sans","Manrope","Inter",sans-serif'. Mida en funció de H (ex: Math.round(H*0.1)).
+- NO facis servir: fetch, document, window, setTimeout/setInterval, import/require, eval, ni cap accés a xarxa o emmagatzematge. NOMÉS dibuix amb ctx.
+- Codi robust: no assumeixis que u.images té elements si no hi ha adjunts.
 
-Convencions IMPORTANTS:
-- Posicions x,y (i x1/y1/x2/y2) són normalitzades 0..1 (0,0 = dalt-esquerra; 1,1 = baix-dreta).
-- Mides (size, r, h de bar, lineWidth, rise) són FRACCIÓ DE L'ALÇADA. Un títol sol anar entre 0.08 i 0.13; un subtítol entre 0.03 i 0.045.
-- "w" (amplada de bar i d'image) és fracció de l'AMPLADA. Per a IMAGE, si no poses "h" es manté la proporció original de la imatge.
-- "start" és quan la capa apareix (ms); "in" és la durada de l'entrada. Escalona els "start".
-- Tots els elements es queden visibles després d'entrar.
-- Tria colors que contrastin bé amb el fons.
+Imatges adjuntes: si n'hi ha, estan indexades 0,1,2… en l'ordre rebut. Si l'usuari vol inserir-les, dibuixa-les amb u.images[index]. Si són només de referència d'estil, imita'n colors/estil però no les dibuixis.
+Documents (PDF/text): usa'ls com a contingut/context.
 
-IMATGES ADJUNTES:
-- Si hi ha imatges adjuntes, estan indexades començant per 0 en l'ordre en què apareixen.
-- Per INSERIR una imatge adjunta dins l'animació (logo, foto…), usa una capa IMAGE amb "ref" igual al seu índex.
-- Si l'usuari demana que la imatge sigui només de REFERÈNCIA d'estil (colors, tipografia, to), NO l'insereixis: limita't a imitar-ne la paleta i l'estil en les altres capes.
-- Segueix el que digui el text de l'usuari per decidir si una imatge és per inserir o per referència.
+Mai expliquis les teves limitacions ni parlis de tu mateix: limita't a fer la millor animació possible del que es demana.
 
-MOVIMENT (clau perquè quedi VIU):
-Qualsevol capa pot portar un camp "motion" que la desplaça, gira o escala al llarg del temps:
-"motion": {
-  "loop": boolean,        // true per a moviments continus (flotar, girar, bategar)
-  "duration": ms,         // durada d'un cicle; si l'omets, dura tota l'animació
-  "x": Keyframe[],        // desplaçament horitzontal (fracció d'amplada; -0.5 = mitja pantalla cap a l'esquerra)
-  "y": Keyframe[],        // desplaçament vertical (fracció d'alçada; valors negatius = amunt)
-  "scale": Keyframe[],    // mida (1 = original, 1.2 = 20% més gran)
-  "rotate": Keyframe[]    // graus
-}
-Keyframe = { "t":0..1, "v":number, "ease":"linear"|"inOut"|"out" }   // "t" és la fracció del cicle
+FORMAT DE RESPOSTA (exacte):
+TITOL: <títol curt>
+DURADA: <durada en ms, entre 3000 i 12000>
+FONS: <color de fons en hex>
+---
+<aquí NOMÉS el codi JavaScript, sense \`\`\` ni explicacions>`;
 
-Exemples (copia'ls i adapta'ls):
-- Flotar suau:        "motion":{"loop":true,"duration":2500,"y":[{"t":0,"v":0},{"t":0.5,"v":-0.03,"ease":"inOut"},{"t":1,"v":0,"ease":"inOut"}]}
-- Bategar:            "motion":{"loop":true,"duration":1500,"scale":[{"t":0,"v":1},{"t":0.5,"v":1.12,"ease":"inOut"},{"t":1,"v":1,"ease":"inOut"}]}
-- Girar sense parar:  "motion":{"loop":true,"duration":6000,"rotate":[{"t":0,"v":0},{"t":1,"v":360}]}
-- Entrar lliscant:    "motion":{"duration":700,"x":[{"t":0,"v":-0.5,"ease":"out"},{"t":1,"v":0}]}
-- Travessar la pantalla: "motion":{"loop":true,"duration":5000,"x":[{"t":0,"v":-0.6},{"t":1,"v":0.6}]}
-
-Fes servir el moviment GENEROSAMENT: títols que entren lliscant, elements decoratius que floten/bateguen/giren, accents que es desplacen. Combina l'entrada (start/in) amb "motion". Una bona animació gairebé sempre té diversos elements en moviment.
-
-DOCUMENTS ADJUNTS (PDF/text): usa'ls com a contingut o context (textos, dades, guió) per omplir l'animació.
-
-REGLES DE COMPORTAMENT (molt importants):
-- Construeix SEMPRE el que demana l'usuari amb les primitives disponibles. Si alguna cosa no es pot fer literalment, APROXIMA-LA de manera creativa amb formes, text, colors i composició.
-- NO generis MAI una animació que expliqui les teves limitacions, que parli del "motor" o de tu mateix, ni que digui què pots o no pots fer. L'usuari vol la SEVA animació, no un missatge sobre les teves capacitats.
-- Sigues generós: omple l'escena amb diversos elements ben col·locats i escalonats perquè quedi viva i acabada.
-
-Respon NOMÉS amb el JSON.`;
-
-function extractJson(text: string): AnimationSpec {
-  let t = text.trim();
-  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) t = fence[1].trim();
-  const start = t.indexOf("{");
-  const end = t.lastIndexOf("}");
-  if (start !== -1 && end !== -1) t = t.slice(start, end + 1);
-  return JSON.parse(t) as AnimationSpec;
+function parseResponse(text: string): CodeAnimationData {
+  const sep = text.indexOf("---");
+  const header = sep >= 0 ? text.slice(0, sep) : "";
+  let code = sep >= 0 ? text.slice(sep + 3) : text;
+  // Strip any markdown fences the model may have added.
+  code = code.replace(/```[a-zA-Z]*\n?/g, "").replace(/```/g, "").trim();
+  const title = header.match(/TITOL:\s*(.+)/i)?.[1]?.trim() || "Animació generada";
+  const duration = parseInt(header.match(/DURADA:\s*(\d+)/i)?.[1] || "6000", 10);
+  const background = header.match(/FONS:\s*(#[0-9a-fA-F]{3,8})/)?.[1] || "#0a1c3f";
+  return { title, duration, background, code };
 }
 
 type ContentBlock =
@@ -123,7 +93,7 @@ export const generateAnimation = createServerFn({ method: "POST" })
       docs: clean(obj.docs),
     };
   })
-  .handler(async ({ data }): Promise<AnimationSpec> => {
+  .handler(async ({ data }): Promise<CodeAnimationData> => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       throw new Error(
@@ -155,7 +125,7 @@ export const generateAnimation = createServerFn({ method: "POST" })
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4000,
+        max_tokens: 8000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content }],
       }),
@@ -169,10 +139,5 @@ export const generateAnimation = createServerFn({ method: "POST" })
     const json = (await res.json()) as { content?: { type: string; text?: string }[] };
     const textBlock = json.content?.find((b) => b.type === "text")?.text ?? "";
     if (!textBlock) throw new Error("Resposta buida del model.");
-
-    try {
-      return extractJson(textBlock);
-    } catch {
-      throw new Error("El model no ha retornat un JSON vàlid. Torna-ho a provar.");
-    }
+    return parseResponse(textBlock);
   });

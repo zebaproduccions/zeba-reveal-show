@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ANIMATIONS, DEFAULT_ANIMATION } from "@/animations";
 import { generateAnimation } from "@/lib/ai/generate";
-import { fromSpec } from "@/lib/engine/spec";
+import { fromCode } from "@/lib/engine/code-animation";
 import { drawFrame } from "@/lib/engine/renderer";
 import { recordAnimation } from "@/lib/engine/recorder";
 import type { Animation } from "@/lib/engine/types";
@@ -147,7 +147,7 @@ function Index() {
     try {
       const imageAtts = attachments.filter((a) => a.type === "image");
       const docAtts = attachments.filter((a) => a.type === "pdf");
-      const spec = await generateAnimation({
+      const result = await generateAnimation({
         data: {
           prompt,
           images: imageAtts.map((a) => a.send),
@@ -155,7 +155,7 @@ function Index() {
         },
       });
       const imgEls = imageAtts.map((a) => a.img!).filter(Boolean);
-      const a = fromSpec(spec, imgEls);
+      const a = fromCode(result, imgEls);
       setGenerated(a);
       setSelectedId(a.id);
       setReplayKey((k) => k + 1);
