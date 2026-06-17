@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ANIMATIONS, DEFAULT_ANIMATION, getAnimation } from "@/animations";
-
+import { ANIMATIONS, DEFAULT_ANIMATION } from "@/animations";
+import { generateAnimation } from "@/lib/ai/generate";
+import { fromSpec } from "@/lib/engine/spec";
 import { drawFrame } from "@/lib/engine/renderer";
 import { recordAnimation } from "@/lib/engine/recorder";
+import type { Animation } from "@/lib/engine/types";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -11,13 +13,18 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [generated, setGenerated] = useState<Animation | null>(null);
   const [selectedId, setSelectedId] = useState(DEFAULT_ANIMATION.id);
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState<null | "webm" | "mp4">(null);
   const [progress, setProgress] = useState(0);
   const [replayKey, setReplayKey] = useState(0);
+  const [prompt, setPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const anim = getAnimation(selectedId) ?? DEFAULT_ANIMATION;
+  const list: Animation[] = generated ? [...ANIMATIONS, generated] : ANIMATIONS;
+  const anim = list.find((a) => a.id === selectedId) ?? DEFAULT_ANIMATION;
 
   // Load the selected animation's data whenever the selection changes.
   useEffect(() => {
@@ -39,7 +46,6 @@ function Index() {
     const ctx = canvas.getContext("2d")!;
     const W = canvas.width;
     const H = canvas.height;
-    // Raw timeline length; startDelay is consumed inside drawFrame.
     const total = anim.duration + 500;
     const start = performance.now();
     let raf = 0;
@@ -56,6 +62,23 @@ function Index() {
     if (recording || id === selectedId) return;
     setSelectedId(id);
     setReplayKey((k) => k + 1);
+  };
+
+  const handleGenerate = async () => {
+    if (generating || recording || prompt.trim().length === 0) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const spec = await generateAnimation({ data: prompt });
+      const a = fromSpec(spec);
+      setGenerated(a);
+      setSelectedId(a.id);
+      setReplayKey((k) => k + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No s'ha pogut generar l'animació.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleDownload = async (format: "webm" | "mp4") => {
@@ -86,15 +109,40 @@ function Index() {
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap"
       />
 
-      {ANIMATIONS.length > 1 && (
+      {/* Prompt box — generate a new animation by describing it */}
+      <div className="w-full max-w-[1280px] mb-5">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleGenerate();
+            }}
+            disabled={generating || busy}
+            placeholder="Descriu una animació nova… ex: una intro amb el títol 'Estiu 2026' i tres cercles de colors"
+            className="flex-1 text-sm px-4 py-3 rounded-xl border border-[#0a2342]/20 bg-white/70 text-[#0a2342] placeholder:text-[#0a2342]/40 outline-none focus:border-[#0a2342]/50 transition disabled:opacity-60"
+          />
+          <button
+            onClick={handleGenerate}
+            disabled={generating || busy || prompt.trim().length === 0}
+            className="text-sm px-5 py-3 rounded-xl text-white hover:opacity-90 transition disabled:opacity-50 bg-[#0a2342] whitespace-nowrap"
+          >
+            {generating ? "Generant…" : "Generar amb IA"}
+          </button>
+        </div>
+        {error && <p className="mt-2 text-sm text-[#a3331f]">{error}</p>}
+      </div>
+
+      {list.length > 1 && (
         <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
-          {ANIMATIONS.map((a) => {
+          {list.map((a) => {
             const active = a.id === selectedId;
             return (
               <button
                 key={a.id}
                 onClick={() => handleSelect(a.id)}
-                disabled={busy}
+                disabled={busy || generating}
                 aria-pressed={active}
                 className={
                   "text-sm px-4 py-2 rounded-full border transition disabled:opacity-50 " +
