@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ANIMATIONS, DEFAULT_ANIMATION } from "@/animations";
 import { generateAnimation } from "@/lib/ai/generate";
+import { startVideo, pollVideo } from "@/lib/ai/video";
 import { fromCode } from "@/lib/engine/code-animation";
 import { drawFrame } from "@/lib/engine/renderer";
 import { recordAnimation } from "@/lib/engine/recorder";
@@ -11,13 +12,17 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+type Mode = "graphic" | "video";
+
 type Attachment = {
   id: string;
   type: "image" | "pdf";
   name: string;
   send: { media_type: string; data: string };
-  img?: HTMLImageElement; // original, for rendering into the video
+  img?: HTMLImageElement;
 };
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const readDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -35,8 +40,6 @@ const loadImage = (src: string) =>
     img.src = src;
   });
 
-// Downscale to ~1024px JPEG to keep the payload (and token cost) small when
-// sending to the model. The full-res original is kept separately for rendering.
 async function processImage(file: File): Promise<Attachment> {
   const dataUrl = await readDataUrl(file);
   const img = await loadImage(dataUrl);
@@ -71,6 +74,8 @@ async function processPdf(file: File): Promise<Attachment> {
 function Index() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const genToken = useRef(0);
+  const [mode, setMode] = useState<Mode>("graphic");
   const [generated, setGenerated] = useState<Animation | null>(null);
   const [selectedId, setSelectedId] = useState(DEFAULT_ANIMATION.id);
   const [ready, setReady] = useState(false);
@@ -81,6 +86,8 @@ function Index() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoStatus, setVideoStatus] = useState<string | null>(null);
 
   const list: Animation[] = generated ? [...ANIMATIONS, generated] : ANIMATIONS;
   const anim = list.find((a) => a.id === selectedId) ?? DEFAULT_ANIMATION;
@@ -97,7 +104,7 @@ function Index() {
   }, [anim]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (mode !== "graphic" || !ready) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
@@ -113,7 +120,7 @@ function Index() {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [replayKey, ready, anim]);
+  }, [replayKey, ready, anim, mode]);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -140,8 +147,7 @@ function Index() {
     setReplayKey((k) => k + 1);
   };
 
-  const handleGenerate = async () => {
-    if (generating || recording || prompt.trim().length === 0) return;
+  const handleGenerateGraphic = async () => {
     setGenerating(true);
     setError(null);
     try {
@@ -166,6 +172,53 @@ function Index() {
     }
   };
 
+  const handleGenerateVideo = async () => {
+    const imageAtt = attachments.find((a) => a.type === "image");
+    if (!imageAtt) {
+      setError("Adjunta una imatge per al mode vídeo.");
+      return;
+    }
+    const myToken = ++genToken.current;
+    setGenerating(true);
+    setError(null);
+    setVideoUrl(null);
+    setVideoStatus("Iniciant…");
+    try {
+      const image = `data:${imageAtt.send.media_type};base64,${imageAtt.send.data}`;
+      const start = await startVideo({ data: { prompt, image } });
+      for (let i = 0; i < 120; i++) {
+        if (genToken.current !== myToken) return;
+        await sleep(3000);
+        if (genToken.current !== myToken) return;
+        const st = await pollVideo({ data: { id: start.id } });
+        if (st.status === "succeeded" && st.url) {
+          setVideoUrl(st.url);
+          setVideoStatus(null);
+          return;
+        }
+        if (st.status === "failed" || st.status === "canceled") {
+          throw new Error(st.error || "La generació del vídeo ha fallat.");
+        }
+        setVideoStatus(`Generant vídeo… (${(i + 1) * 3}s)`);
+      }
+      throw new Error("El vídeo triga massa. Torna-ho a provar.");
+    } catch (err) {
+      if (genToken.current === myToken)
+        setError(err instanceof Error ? err.message : "No s'ha pogut generar el vídeo.");
+    } finally {
+      if (genToken.current === myToken) {
+        setGenerating(false);
+        setVideoStatus(null);
+      }
+    }
+  };
+
+  const handleGenerate = () => {
+    if (generating || recording || prompt.trim().length === 0) return;
+    if (mode === "video") handleGenerateVideo();
+    else handleGenerateGraphic();
+  };
+
   const handleDownload = async (format: "webm" | "mp4") => {
     if (recording) return;
     setRecording(format);
@@ -181,6 +234,10 @@ function Index() {
   };
 
   const busy = recording !== null;
+  const placeholder =
+    mode === "video"
+      ? "Descriu el moviment… ex: el nen de la imatge saluda movent el braç"
+      : "Descriu una animació… ex: una intro amb el títol 'Estiu 2026' i cercles que floten";
 
   return (
     <main
@@ -192,7 +249,27 @@ function Index() {
         href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap"
       />
 
-      {/* Prompt box — generate a new animation by describing it (+ attachments) */}
+      {/* Mode switch */}
+      <div className="w-full max-w-[1280px] mb-3 flex gap-2">
+        {(["graphic", "video"] as Mode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            disabled={generating || busy}
+            aria-pressed={mode === m}
+            className={
+              "text-sm px-4 py-2 rounded-full border transition disabled:opacity-50 " +
+              (mode === m
+                ? "bg-[#0a2342] text-white border-[#0a2342]"
+                : "border-[#0a2342]/20 text-[#0a2342] hover:bg-white/60")
+            }
+          >
+            {m === "graphic" ? "Grafisme" : "Vídeo IA"}
+          </button>
+        ))}
+      </div>
+
+      {/* Prompt box */}
       <div className="w-full max-w-[1280px] mb-5">
         <div className="flex flex-col sm:flex-row gap-2">
           <input
@@ -203,7 +280,7 @@ function Index() {
               if (e.key === "Enter") handleGenerate();
             }}
             disabled={generating || busy}
-            placeholder="Descriu una animació nova… ex: una intro amb el títol 'Estiu 2026' i el logo adjunt a baix a la dreta"
+            placeholder={placeholder}
             className="flex-1 text-sm px-4 py-3 rounded-xl border border-[#0a2342]/20 bg-white/70 text-[#0a2342] placeholder:text-[#0a2342]/40 outline-none focus:border-[#0a2342]/50 transition disabled:opacity-60"
           />
           <input
@@ -226,7 +303,7 @@ function Index() {
             disabled={generating || busy || prompt.trim().length === 0}
             className="text-sm px-5 py-3 rounded-xl text-white hover:opacity-90 transition disabled:opacity-50 bg-[#0a2342] whitespace-nowrap"
           >
-            {generating ? "Generant…" : "Generar amb IA"}
+            {generating ? "Generant…" : mode === "video" ? "Generar vídeo" : "Generar amb IA"}
           </button>
         </div>
 
@@ -238,9 +315,7 @@ function Index() {
                 className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/70 border border-[#0a2342]/15 text-[#0a2342]"
               >
                 {a.type === "image" ? "🖼" : "📄"} {a.name}
-                {a.type === "image" && (
-                  <span className="text-[#0a2342]/50">#{i}</span>
-                )}
+                {a.type === "image" && <span className="text-[#0a2342]/50">#{i}</span>}
                 <button
                   onClick={() => removeAttachment(a.id)}
                   className="text-[#0a2342]/50 hover:text-[#a3331f]"
@@ -252,10 +327,15 @@ function Index() {
             ))}
           </div>
         )}
+        {mode === "video" && (
+          <p className="mt-2 text-xs text-[#0a2342]/50">
+            El mode vídeo anima una imatge adjunta. Triga ~30 s–2 min i té cost per clip.
+          </p>
+        )}
         {error && <p className="mt-2 text-sm text-[#a3331f]">{error}</p>}
       </div>
 
-      {list.length > 1 && (
+      {mode === "graphic" && list.length > 1 && (
         <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
           {list.map((a) => {
             const active = a.id === selectedId;
@@ -279,38 +359,73 @@ function Index() {
         </div>
       )}
 
-      <div className="w-full max-w-[1280px] aspect-video rounded-lg overflow-hidden shadow-[0_30px_80px_-30px_rgba(10,35,66,0.25)] bg-[#f3ecdf]">
-        <canvas
-          key={`${selectedId}-${replayKey}`}
-          ref={canvasRef}
-          width={anim.width}
-          height={anim.height}
-          className="w-full h-full block"
-        />
+      <div className="w-full max-w-[1280px] aspect-video rounded-lg overflow-hidden shadow-[0_30px_80px_-30px_rgba(10,35,66,0.25)] bg-[#0a1c3f]">
+        {mode === "graphic" ? (
+          <canvas
+            key={`${selectedId}-${replayKey}`}
+            ref={canvasRef}
+            width={anim.width}
+            height={anim.height}
+            className="w-full h-full block"
+          />
+        ) : videoUrl ? (
+          <video
+            key={videoUrl}
+            src={videoUrl}
+            autoPlay
+            loop
+            controls
+            muted
+            playsInline
+            className="w-full h-full object-contain bg-black"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-white/70 text-sm px-6 text-center">
+            {videoStatus ?? "Adjunta una imatge i descriu el moviment, després «Generar vídeo»."}
+          </div>
+        )}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <button
-          onClick={() => setReplayKey((k) => k + 1)}
-          disabled={busy || !ready}
-          className="text-sm px-4 py-2 rounded-full border border-[#0a2342]/20 text-[#0a2342] hover:bg-white/60 transition disabled:opacity-50"
-        >
-          Repetir
-        </button>
-        <button
-          onClick={() => handleDownload("webm")}
-          disabled={busy || !ready}
-          className="text-sm px-5 py-2 rounded-full border border-[#0a2342]/20 text-[#0a2342] hover:bg-white/60 transition disabled:opacity-60"
-        >
-          {recording === "webm" ? `Gravant… ${Math.round(progress * 100)}%` : "Descarregar .webm"}
-        </button>
-        <button
-          onClick={() => handleDownload("mp4")}
-          disabled={busy || !ready}
-          className="text-sm px-5 py-2 rounded-full text-white hover:opacity-90 transition disabled:opacity-60 bg-[#0a2342]"
-        >
-          {recording === "mp4" ? `Gravant… ${Math.round(progress * 100)}%` : "Descarregar .mp4"}
-        </button>
+        {mode === "graphic" ? (
+          <>
+            <button
+              onClick={() => setReplayKey((k) => k + 1)}
+              disabled={busy || !ready}
+              className="text-sm px-4 py-2 rounded-full border border-[#0a2342]/20 text-[#0a2342] hover:bg-white/60 transition disabled:opacity-50"
+            >
+              Repetir
+            </button>
+            <button
+              onClick={() => handleDownload("webm")}
+              disabled={busy || !ready}
+              className="text-sm px-5 py-2 rounded-full border border-[#0a2342]/20 text-[#0a2342] hover:bg-white/60 transition disabled:opacity-60"
+            >
+              {recording === "webm" ? `Gravant… ${Math.round(progress * 100)}%` : "Descarregar .webm"}
+            </button>
+            <button
+              onClick={() => handleDownload("mp4")}
+              disabled={busy || !ready}
+              className="text-sm px-5 py-2 rounded-full text-white hover:opacity-90 transition disabled:opacity-60 bg-[#0a2342]"
+            >
+              {recording === "mp4" ? `Gravant… ${Math.round(progress * 100)}%` : "Descarregar .mp4"}
+            </button>
+          </>
+        ) : (
+          <a
+            href={videoUrl ?? undefined}
+            target="_blank"
+            rel="noreferrer"
+            download
+            aria-disabled={!videoUrl}
+            className={
+              "text-sm px-5 py-2 rounded-full text-white transition bg-[#0a2342] " +
+              (videoUrl ? "hover:opacity-90" : "opacity-40 pointer-events-none")
+            }
+          >
+            Descarregar vídeo
+          </a>
+        )}
       </div>
     </main>
   );
